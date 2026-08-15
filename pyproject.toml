@@ -18,6 +18,9 @@ dependencies = [
 [project.scripts]
 playlist-migrate = "playlist_migrate.cli:main"
 
+[tool.setuptools.packages.find]
+include = ["playlist_migrate*"]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
