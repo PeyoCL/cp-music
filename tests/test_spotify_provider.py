@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from playlist_migrate.exceptions import PlaylistFetchError, SpotifyAuthError
+from playlist_migrate.exceptions import LikedSongsFetchError, PlaylistFetchError, SpotifyAuthError
 from playlist_migrate.models import Track
 from playlist_migrate.providers.spotify import SpotifyClient
 
@@ -159,6 +159,79 @@ class TestSpotifyGetPlaylist:
 
         with pytest.raises(PlaylistFetchError, match="Failed to fetch Spotify playlist"):
             client.get_playlist("invalid_id")
+
+
+class TestSpotifyGetLikedSongs:
+    def test_get_liked_songs_success(self, spotify_client_mocked: tuple[SpotifyClient, MagicMock]) -> None:
+        client, mock_sp = spotify_client_mocked
+
+        mock_sp.current_user_saved_tracks.side_effect = [
+            {
+                "total": 3,
+                "items": [
+                    {
+                        "track": {
+                            "name": "Favorite 1",
+                            "artists": [{"name": "Artist 1"}],
+                            "album": {"name": "Album 1"},
+                            "duration_ms": 180000,
+                            "external_ids": {"isrc": "US1111111111"},
+                            "id": "track_fav_1",
+                        }
+                    },
+                    {
+                        "track": {
+                            "name": "Favorite 2",
+                            "artists": [{"name": "Artist 2"}],
+                            "album": {"name": "Album 2"},
+                            "duration_ms": 200000,
+                            "external_ids": {},
+                            "id": "track_fav_2",
+                        }
+                    },
+                ],
+            },
+            {
+                "total": 3,
+                "items": [
+                    {
+                        "track": {
+                            "name": "Favorite 3",
+                            "artists": [{"name": "Artist 3"}],
+                            "album": {"name": "Album 3"},
+                            "duration_ms": 220000,
+                            "external_ids": {"isrc": "US3333333333"},
+                            "id": "track_fav_3",
+                        }
+                    }
+                ],
+            },
+            {"total": 3, "items": []},
+        ]
+
+        liked = client.get_liked_songs()
+
+        assert liked.id == "liked_songs"
+        assert liked.name == "Tus Me Gusta"
+        assert len(liked.tracks) == 3
+        assert liked.tracks[0].title == "Favorite 1"
+        assert liked.tracks[0].isrc == "US1111111111"
+        assert liked.tracks[2].title == "Favorite 3"
+
+    def test_get_liked_songs_unauthenticated_raises_error(self) -> None:
+        client = SpotifyClient.__new__(SpotifyClient)
+        client.sp = None
+        with pytest.raises(SpotifyAuthError, match="Spotify client is not authenticated"):
+            client.get_liked_songs()
+
+    def test_get_liked_songs_api_failure_raises_error(
+        self, spotify_client_mocked: tuple[SpotifyClient, MagicMock]
+    ) -> None:
+        client, mock_sp = spotify_client_mocked
+        mock_sp.current_user_saved_tracks.side_effect = Exception("API rate limit or connection error")
+
+        with pytest.raises(LikedSongsFetchError, match="Failed to fetch Spotify liked songs"):
+            client.get_liked_songs()
 
 
 class TestSpotifyGetExistingPlaylist:

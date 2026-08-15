@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from playlist_migrate.exceptions import PlaylistFetchError, YTMusicAuthError
+from playlist_migrate.exceptions import LikedSongsFetchError, PlaylistFetchError, YTMusicAuthError
 from playlist_migrate.models import Track
 from playlist_migrate.providers.ytmusic import YTMusicClient
 
@@ -124,6 +124,57 @@ class TestYTMusicGetPlaylist:
 
         with pytest.raises(PlaylistFetchError, match="Failed to fetch YTMusic playlist"):
             client.get_playlist("PL_INVALID")
+
+
+class TestYTMusicGetLikedSongs:
+    def test_get_liked_songs_success(self, ytmusic_client_mocked: tuple[YTMusicClient, MagicMock]) -> None:
+        client, mock_yt = ytmusic_client_mocked
+        mock_yt.get_liked_songs.return_value = {
+            "title": "Música que te gusta",
+            "description": "Your favorites",
+            "thumbnails": [{"url": "http://img/lm.jpg"}],
+            "tracks": [
+                {
+                    "title": "Favorite Song 1",
+                    "artists": [{"name": "Artist A"}],
+                    "album": {"name": "Album A"},
+                    "duration_seconds": 210,
+                    "videoId": "vid_fav_1",
+                },
+                {
+                    "title": "Favorite Song 2",
+                    "artists": [{"name": "Artist B"}],
+                    "album": None,
+                    "duration_seconds": 180,
+                    "videoId": "vid_fav_2",
+                },
+            ],
+        }
+
+        liked = client.get_liked_songs()
+
+        assert liked.id == "LM"
+        assert liked.name == "Música que te gusta"
+        assert liked.source == "YouTube Music"
+        assert len(liked.tracks) == 2
+        assert liked.tracks[0].title == "Favorite Song 1"
+        assert liked.tracks[0].video_id == "vid_fav_1"
+        assert liked.tracks[0].duration_ms == 210000
+
+    def test_get_liked_songs_unauthenticated_raises_error(self) -> None:
+        client = YTMusicClient.__new__(YTMusicClient)
+        client.ytmusic = None
+        with pytest.raises(YTMusicAuthError, match="YTMusic client is not initialized"):
+            client.get_liked_songs()
+
+    def test_get_liked_songs_api_failure_raises_error(
+        self, ytmusic_client_mocked: tuple[YTMusicClient, MagicMock]
+    ) -> None:
+        client, mock_yt = ytmusic_client_mocked
+        mock_yt.get_liked_songs.side_effect = Exception("Service unavailable")
+
+        with pytest.raises(LikedSongsFetchError, match="Failed to fetch YouTube Music liked songs"):
+            client.get_liked_songs()
 
 
 class TestYTMusicGetExistingPlaylist:

@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from playlist_migrate.exceptions import ProviderNotFoundError
+from playlist_migrate.exceptions import InvalidConfigurationError, ProviderNotFoundError
 from playlist_migrate.interfaces import MusicProvider
 from playlist_migrate.models import (
     MigrationResult,
@@ -29,35 +29,35 @@ class PlaylistMigrator:
         providers: Dictionary mapping provider ID (e.g. 'spotify') to a MusicProvider instance.
     """
 
-    def __init__(
-        self,
-        providers: dict[str, MusicProvider],
-    ) -> None:
+    def __init__(self, providers: dict[str, MusicProvider]) -> None:
         self.providers = providers
 
     # ------------------------------------------------------------------
-    # Public API
+    # Main migration flow
     # ------------------------------------------------------------------
 
     async def migrate(
         self,
         source_id: str,
         target_id: str,
-        playlist_identifier: str,
+        playlist_identifier: str | None = None,
         target_name: str | None = None,
         sync: bool = False,
+        liked_songs: bool = False,
     ) -> MigrationResult:
-        """Migrate a playlist from a source provider to a target provider.
+        """Migrate a playlist or liked songs library from a source provider to a target provider.
 
         Args:
             source_id: Provider ID of the source platform (e.g. 'spotify').
             target_id: Provider ID of the target platform (e.g. 'ytmusic').
-            playlist_identifier: Native playlist ID on the source platform.
+            playlist_identifier: Native playlist ID on the source platform (required if liked_songs=False).
             target_name: Override the destination playlist name.
             sync: If True, replace the target playlist contents to match exactly.
                   Otherwise, just add missing tracks (idempotent).
+            liked_songs: If True, migrate the user's liked/favorited songs library.
         """
-        logger.info("Starting %s → %s migration: %s", source_id, target_id, playlist_identifier)
+        if not liked_songs and not playlist_identifier:
+            raise InvalidConfigurationError("Either playlist_identifier or liked_songs=True must be provided.")
 
         source_provider = self.providers.get(source_id)
         target_provider = self.providers.get(target_id)
@@ -67,10 +67,16 @@ class PlaylistMigrator:
         if not target_provider:
             raise ProviderNotFoundError(f"Target provider '{target_id}' not found.")
 
-        source: Playlist = source_provider.get_playlist(playlist_identifier)
-        dest_name = target_name or source.name
+        if liked_songs:
+            logger.info("Starting %s → %s Liked Songs migration", source_id, target_id)
+            source: Playlist = source_provider.get_liked_songs()
+            direction_label = f"{source_id.title()} → {target_id.title()} (Liked Songs)"
+        else:
+            logger.info("Starting %s → %s migration: %s", source_id, target_id, playlist_identifier)
+            source = source_provider.get_playlist(playlist_identifier)  # type: ignore[arg-type]
+            direction_label = f"{source_id.title()} → {target_id.title()}"
 
-        direction_label = f"{source_id.title()} → {target_id.title()}"
+        dest_name = target_name or source.name
 
         if not source.tracks:
             logger.warning("%s playlist '%s' is empty. Aborting.", source_id.title(), source.name)

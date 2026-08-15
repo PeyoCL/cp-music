@@ -24,6 +24,12 @@ class ProviderNotFoundError(PlaylistMigrateError):
     pass
 
 
+class InvalidConfigurationError(PlaylistMigrateError):
+    """Raised when invalid or conflicting CLI options/configuration are supplied."""
+
+    pass
+
+
 class AuthError(PlaylistMigrateError):
     """Base exception for authentication and credential failures."""
 
@@ -68,6 +74,12 @@ class RateLimitError(PlaylistMigrateError):
 
 class PlaylistError(PlaylistMigrateError):
     """Base exception for playlist operations."""
+
+    pass
+
+
+class LikedSongsFetchError(PlaylistError):
+    """Raised when fetching liked songs library fails."""
 
     pass
 

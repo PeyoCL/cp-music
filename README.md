@@ -124,27 +124,37 @@ Puedes ejecutar la herramienta directamente con `playlist-migrate` (o `uv run py
 ### Sintaxis Directa
 
 ```bash
+# Migrar una playlist por su ID
 playlist-migrate PLAYLIST_ID \
     --source <proveedor_origen> \
     --target <proveedor_destino> \
     [--name "Nombre Destino"] \
     [--sync] \
     [--verbose]
+
+# Migrar canciones favoritas / Tus Me Gusta / Canciones que te gustan
+playlist-migrate \
+    --liked-songs-pl \
+    --source <proveedor_origen> \
+    --target <proveedor_destino> \
+    [--name "Nombre Destino"] \
+    [--sync]
 ```
 
 ### Ejemplos
 
 ```bash
-# Spotify → YouTube Music
+# Spotify → YouTube Music (Playlist normal)
 playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" --source spotify --target ytmusic
 
-# YouTube Music → Spotify
-playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
+# Spotify → YouTube Music (Canciones Favoritas / "Tus me gusta")
+playlist-migrate --liked-songs-pl --source spotify --target ytmusic
 
-# Con nombre personalizado en el destino
-playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" \
-    --source spotify --target ytmusic \
-    --name "Mis Favoritos"
+# Con alias corto (-lsp) y nombre personalizado en el destino
+playlist-migrate -lsp -s spotify -t ytmusic --name "Mis Favoritas Spotify"
+
+# YouTube Music → Spotify (Playlist normal)
+playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
 
 # Modo sincronización exacta (borra lo que sobra en destino)
 playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
@@ -155,10 +165,11 @@ playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
 
 | Opción | Alias | Descripción |
 |---|---|---|
-| `PLAYLIST_ID` | Posicional | ID nativo de la playlist en el servicio origen |
+| `PLAYLIST_ID` | Posicional | ID nativo de la playlist origen (omitir si usas `--liked-songs-pl`) |
+| `--liked-songs-pl`, `--liked-songs` | `-lsp` | Migra la biblioteca de canciones favoritas ("Tus me gusta" / "Liked Music") |
 | `--source ID` | `-s` | Proveedor origen (`spotify`, `ytmusic`) |
 | `--target ID` | `-t` | Proveedor destino (`spotify`, `ytmusic`) |
-| `--name NAME` | `-n` | Nombre personalizado para la playlist destino |
+| `--name NAME` | `-n` | Nombre personalizado para la playlist destino (default: nombre origen) |
 | `--sync` | — | Reemplaza el contenido del destino para que sea idéntico al origen |
 | `--auth-file PATH` | — | Ruta al archivo `headers_auth.json` de YTMusic (default: `headers_auth.json`) |
 | `--verbose` | `-v` | Activa logging DEBUG detallado |

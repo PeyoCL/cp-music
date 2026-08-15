@@ -11,6 +11,7 @@ import pytest
 from playlist_migrate.cli import _build_parser, _build_setup_auth_parser, main
 from playlist_migrate.exceptions import (
     AuthError,
+    LikedSongsFetchError,
     NetworkError,
     PlaylistError,
     RateLimitError,
@@ -27,6 +28,7 @@ class TestCLIParser:
         assert args.target == "ytmusic"
         assert args.name == "My List"
         assert args.sync is False
+        assert args.liked_songs is False
 
     def test_short_flags_migration_arguments(self) -> None:
         parser = _build_parser()
@@ -37,6 +39,21 @@ class TestCLIParser:
         assert args.target == "spotify"
         assert args.sync is True
         assert args.verbose is True
+        assert args.liked_songs is False
+
+    def test_liked_songs_flag_parsing(self) -> None:
+        parser = _build_parser()
+
+        args1 = parser.parse_args(["--liked-songs-pl", "--source", "spotify", "--target", "ytmusic"])
+        assert args1.liked_songs is True
+        assert args1.playlist_id is None
+
+        args2 = parser.parse_args(["-lsp", "-s", "spotify", "-t", "ytmusic", "-n", "Mis Favoritas"])
+        assert args2.liked_songs is True
+        assert args2.name == "Mis Favoritas"
+
+        args3 = parser.parse_args(["--liked-songs", "-s", "spotify", "-t", "ytmusic"])
+        assert args3.liked_songs is True
 
     def test_setup_auth_parser(self) -> None:
         parser = _build_setup_auth_parser()
@@ -56,6 +73,14 @@ class TestCLIExecution:
 
     def test_missing_arguments_exits_with_error(self) -> None:
         with patch("sys.argv", ["playlist-migrate"]), pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+
+    def test_missing_playlist_id_and_not_liked_songs_exits_with_error(self) -> None:
+        with (
+            patch("sys.argv", ["playlist-migrate", "--source", "spotify", "--target", "ytmusic"]),
+            pytest.raises(SystemExit) as exc_info,
+        ):
             main()
         assert exc_info.value.code == 1
 
@@ -113,6 +138,29 @@ class TestCLIExecution:
                 playlist_identifier="37i9dQZF1DXcBWIGoYBM5M",
                 target_name=None,
                 sync=False,
+                liked_songs=False,
+            )
+
+    def test_liked_songs_migration_success(self) -> None:
+        mock_migrator = MagicMock()
+        mock_migrator.migrate = AsyncMock()
+
+        with (
+            patch("sys.argv", ["playlist-migrate", "--liked-songs-pl", "-s", "spotify", "-t", "ytmusic"]),
+            patch("playlist_migrate.cli.SpotifyClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.YTMusicClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.Path.exists", return_value=True),
+            patch("playlist_migrate.cli.PlaylistMigrator", return_value=mock_migrator),
+        ):
+            main()
+
+            mock_migrator.migrate.assert_awaited_once_with(
+                source_id="spotify",
+                target_id="ytmusic",
+                playlist_identifier=None,
+                target_name=None,
+                sync=False,
+                liked_songs=True,
             )
 
     def test_migration_rate_limit_error_handled(self) -> None:
@@ -137,6 +185,22 @@ class TestCLIExecution:
 
         with (
             patch("sys.argv", ["playlist-migrate", "PL_123", "-s", "spotify", "-t", "ytmusic"]),
+            patch("playlist_migrate.cli.SpotifyClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.YTMusicClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.Path.exists", return_value=True),
+            patch("playlist_migrate.cli.PlaylistMigrator", return_value=mock_migrator),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        assert exc_info.value.code == 1
+
+    def test_migration_liked_songs_error_handled(self) -> None:
+        mock_migrator = MagicMock()
+        mock_migrator.migrate = AsyncMock(side_effect=LikedSongsFetchError("Failed to fetch favorites"))
+
+        with (
+            patch("sys.argv", ["playlist-migrate", "-lsp", "-s", "spotify", "-t", "ytmusic"]),
             patch("playlist_migrate.cli.SpotifyClient", return_value=MagicMock()),
             patch("playlist_migrate.cli.YTMusicClient", return_value=MagicMock()),
             patch("playlist_migrate.cli.Path.exists", return_value=True),

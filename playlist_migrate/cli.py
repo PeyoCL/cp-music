@@ -4,7 +4,8 @@ cli.py — Command-line interface for playlist-migrate.
 Direct Migration:
     playlist-migrate "PLAYLIST_ID" --source spotify --target ytmusic
     playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
-    playlist-migrate "..." --source spotify --target ytmusic --name "My Road Trip"
+    playlist-migrate --liked-songs-pl --source spotify --target ytmusic
+    playlist-migrate -lsp -s spotify -t ytmusic --name "Mis Favoritas"
 
 Authentication Setup:
     playlist-migrate setup-auth --from-file curl.txt
@@ -22,6 +23,8 @@ from dotenv import load_dotenv
 
 from playlist_migrate.exceptions import (
     AuthError,
+    InvalidConfigurationError,
+    LikedSongsFetchError,
     NetworkError,
     PlaylistError,
     PlaylistMigrateError,
@@ -45,7 +48,7 @@ def _add_migration_arguments(p: argparse.ArgumentParser) -> None:
         "playlist_id",
         nargs="?",
         metavar="PLAYLIST_ID",
-        help="The native identifier (ID) of the source playlist.",
+        help="The native identifier (ID) of the source playlist (omitted if using --liked-songs-pl).",
     )
     p.add_argument(
         "--source",
@@ -60,11 +63,19 @@ def _add_migration_arguments(p: argparse.ArgumentParser) -> None:
         help="Target platform identifier.",
     )
     p.add_argument(
+        "--liked-songs-pl",
+        "--liked-songs",
+        "-lsp",
+        action="store_true",
+        dest="liked_songs",
+        help="Migrate user's Liked Songs library ('Tus me gusta' / 'Liked Music') instead of a playlist ID.",
+    )
+    p.add_argument(
         "--name",
         "-n",
         metavar="NAME",
         default=None,
-        help="Custom name for destination playlist (defaults to source playlist name).",
+        help="Custom name for destination playlist (defaults to source playlist / library name).",
     )
     p.add_argument(
         "--auth-file",
@@ -92,8 +103,9 @@ def _build_parser() -> argparse.ArgumentParser:
         description="playlist-migrate: Extensible playlist migration between streaming services.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Commands & Examples:
-  playlist-migrate <PLAYLIST_ID> --source <SRC> --target <TGT>   Migrate a playlist directly
-  playlist-migrate setup-auth [--from-file FILE]                 Generate YTMusic auth headers
+  playlist-migrate <PLAYLIST_ID> --source <SRC> --target <TGT>     Migrate a playlist directly
+  playlist-migrate --liked-songs-pl --source <SRC> --target <TGT>   Migrate Liked Songs ("Tus me gusta")
+  playlist-migrate setup-auth [--from-file FILE]                   Generate YTMusic auth headers
 """,
     )
     _add_migration_arguments(parser)
@@ -161,8 +173,13 @@ def main(args_list: list[str] | None = None) -> None:
     parser = _build_parser()
     args = parser.parse_args(raw_args)
 
-    # ---- direct migration -------------------------------------------------
-    if not args.playlist_id or not args.source or not args.target:
+    # ---- direct migration / liked songs ----------------------------------
+    if not args.source or not args.target:
+        parser.print_help()
+        sys.exit(1)
+
+    if not args.playlist_id and not args.liked_songs:
+        print("❌ Error: Must specify a PLAYLIST_ID or use --liked-songs-pl (-lsp).")
         parser.print_help()
         sys.exit(1)
 
@@ -204,6 +221,7 @@ def main(args_list: list[str] | None = None) -> None:
                 playlist_identifier=args.playlist_id,
                 target_name=args.name,
                 sync=args.sync,
+                liked_songs=args.liked_songs,
             )
         )
     except RateLimitError as err:
@@ -214,9 +232,17 @@ def main(args_list: list[str] | None = None) -> None:
         logger.error("Network error: %s", err)
         print(f"🌐 Network Error: {err}")
         sys.exit(1)
+    except LikedSongsFetchError as err:
+        logger.error("Liked songs fetch error: %s", err)
+        print(f"❤️ Liked Songs Error: {err}")
+        sys.exit(1)
     except PlaylistError as err:
         logger.error("Playlist operation failed: %s", err)
         print(f"📋 Playlist Error: {err}")
+        sys.exit(1)
+    except InvalidConfigurationError as err:
+        logger.error("Invalid configuration: %s", err)
+        print(f"⚙️ Configuration Error: {err}")
         sys.exit(1)
     except PlaylistMigrateError as err:
         logger.error("Migration domain error: %s", err)

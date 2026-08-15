@@ -30,6 +30,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyPKCE
 
 from playlist_migrate.exceptions import (
+    LikedSongsFetchError,
     PlaylistCreationError,
     PlaylistFetchError,
     PlaylistModificationError,
@@ -53,13 +54,14 @@ class SpotifyClient:
                        ``SPOTIPY_CLIENT_SECRET``.
     """
 
-    # Scopes required for reading and writing user playlists
+    # Scopes required for reading and writing user playlists & library
     _PKCE_SCOPES = (
         "playlist-read-private "
         "playlist-read-collaborative "
         "playlist-modify-public "
         "playlist-modify-private "
-        "ugc-image-upload"
+        "ugc-image-upload "
+        "user-library-read"
     )
 
     def __init__(
@@ -218,6 +220,54 @@ class SpotifyClient:
             source="Spotify",
             tracks=tracks,
             cover_url=cover_url,
+        )
+
+    def get_liked_songs(self) -> Playlist:
+        """Fetch the authenticated user's liked / saved tracks from Spotify.
+
+        Requires PKCE authentication with the ``user-library-read`` scope.
+
+        Returns:
+            :class:`Playlist` populated with all user liked tracks.
+
+        Raises:
+            SpotifyAuthError: If client is not authenticated with Spotify.
+            LikedSongsFetchError: If the API call fails.
+        """
+        if not self.sp:
+            raise SpotifyAuthError("Spotify client is not authenticated.")
+
+        tracks: list[Track] = []
+        offset, limit = 0, 50
+
+        while True:
+            try:
+                page = self.sp.current_user_saved_tracks(limit=limit, offset=offset)
+            except Exception as err:
+                raise LikedSongsFetchError(f"Failed to fetch Spotify liked songs at offset {offset}: {err}") from err
+
+            items = page.get("items", [])
+            if not items:
+                break
+
+            for item in items:
+                raw_track = item.get("track") or item.get("item")
+                parsed = self._parse_track(raw_track)
+                if parsed:
+                    tracks.append(parsed)
+
+            offset += len(items)
+            if offset >= (page.get("total") or 0):
+                break
+
+        logger.info("Loaded %d liked songs from Spotify.", len(tracks))
+        return Playlist(
+            id="liked_songs",
+            name="Tus Me Gusta",
+            description="Liked Songs from Spotify",
+            source="Spotify",
+            tracks=tracks,
+            cover_url=None,
         )
 
     def get_existing_playlist(self, name: str) -> Playlist | None:

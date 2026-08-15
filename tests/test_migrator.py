@@ -8,7 +8,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from playlist_migrate.exceptions import NetworkError, RateLimitError
+from playlist_migrate.exceptions import (
+    InvalidConfigurationError,
+    NetworkError,
+    RateLimitError,
+)
 from playlist_migrate.migrator import PlaylistMigrator
 from playlist_migrate.models import (
     MigrationResult,
@@ -303,3 +307,52 @@ class TestRateLimitingAndExceptions:
         assert len(result.failed_tracks) == 1
         assert result.migrated_count == 0
         assert mock_yt.search_track.call_count == 3
+
+
+class TestLikedSongsMigration:
+    """Tests for migrating user's Liked Songs library."""
+
+    @pytest.mark.asyncio
+    async def test_migrate_liked_songs_spotify_to_ytmusic(self, mock_sp: MagicMock, mock_yt: MagicMock) -> None:
+        liked_pl = make_playlist(
+            name="Tus Me Gusta",
+            tracks=[make_track("Liked Song 1", "Artist 1"), make_track("Liked Song 2", "Artist 2")],
+            source="Spotify",
+        )
+        mock_sp.get_liked_songs.return_value = liked_pl
+        mock_yt.search_track.side_effect = ["vid_1", "vid_2"]
+        mock_yt.get_existing_playlist.return_value = None
+        mock_yt.create_playlist.return_value = "PL_LIKED_YT"
+
+        migrator = PlaylistMigrator(providers={"spotify": mock_sp, "ytmusic": mock_yt})
+        result = await migrator.migrate(
+            source_id="spotify",
+            target_id="ytmusic",
+            liked_songs=True,
+        )
+
+        mock_sp.get_liked_songs.assert_called_once()
+        mock_yt.create_playlist.assert_called_once_with(
+            title="Tus Me Gusta",
+            description="Migrated from Spotify playlist: Tus Me Gusta. Test playlist",
+        )
+        mock_yt.add_tracks.assert_called_once_with(
+            playlist_id="PL_LIKED_YT",
+            track_ids=["vid_1", "vid_2"],
+        )
+        assert result.migrated_count == 2
+        assert result.playlist_name == "Tus Me Gusta"
+        assert result.target_playlist_id == "PL_LIKED_YT"
+
+    @pytest.mark.asyncio
+    async def test_migrate_missing_playlist_id_and_not_liked_songs_raises_error(
+        self, mock_sp: MagicMock, mock_yt: MagicMock
+    ) -> None:
+        migrator = PlaylistMigrator(providers={"spotify": mock_sp, "ytmusic": mock_yt})
+        with pytest.raises(InvalidConfigurationError, match="Either playlist_identifier or liked_songs=True"):
+            await migrator.migrate(
+                source_id="spotify",
+                target_id="ytmusic",
+                playlist_identifier=None,
+                liked_songs=False,
+            )

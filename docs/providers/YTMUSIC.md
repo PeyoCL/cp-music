@@ -116,7 +116,13 @@ El `PLAYLIST_ID` que necesita `playlist-migrate` es el **ID alfanumérico** de l
 # Migrar playlist de YouTube Music hacia Spotify
 playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
 
-# Migrar desde Spotify hacia YouTube Music
+# Migrar desde Spotify hacia YouTube Music (Canciones Favoritas / "Tus me gusta")
+playlist-migrate --liked-songs-pl --source spotify --target ytmusic
+
+# Con alias corto (-lsp) y nombre personalizado
+playlist-migrate -lsp -s spotify -t ytmusic --name "Favoritas Spotify"
+
+# Migrar desde Spotify hacia YouTube Music (Playlist normal)
 playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" --source spotify --target ytmusic
 
 # Con nombre personalizado en destino

@@ -35,6 +35,7 @@ from pathlib import Path
 from ytmusicapi import YTMusic
 
 from playlist_migrate.exceptions import (
+    LikedSongsFetchError,
     PlaylistFetchError,
     PlaylistModificationError,
     YTMusicAuthError,
@@ -326,6 +327,64 @@ class YTMusicClient:
         logger.info("Loaded %d tracks from YTMusic playlist '%s'.", len(tracks), name)
         return Playlist(
             id=playlist_id,
+            name=name,
+            description=description,
+            source="YouTube Music",
+            tracks=tracks,
+            cover_url=cover_url,
+        )
+
+    def get_liked_songs(self) -> Playlist:
+        """Fetch the authenticated user's liked / favorite songs from YouTube Music.
+
+        Uses the 'LM' (Liked Music) playlist in YouTube Music.
+
+        Returns:
+            :class:`Playlist` populated with all liked tracks.
+
+        Raises:
+            YTMusicAuthError: If client is not initialized.
+            LikedSongsFetchError: If fetching fails.
+        """
+        if not self.ytmusic:
+            raise YTMusicAuthError("YTMusic client is not initialized. Run setup-auth first.")
+
+        try:
+            raw = self.ytmusic.get_liked_songs(limit=None)
+        except Exception as err:
+            raise LikedSongsFetchError(f"Failed to fetch YouTube Music liked songs: {err}") from err
+
+        name = raw.get("title", "Música que te gusta") or "Música que te gusta"
+        description = raw.get("description", "") or "Liked Music from YouTube Music"
+        thumbnails = raw.get("thumbnails", [])
+        cover_url = thumbnails[-1].get("url") if thumbnails else None
+
+        tracks: list[Track] = []
+        for item in raw.get("tracks", []):
+            title = item.get("title")
+            if not title:
+                continue
+
+            artists = [a.get("name", "") for a in item.get("artists", []) if a.get("name")]
+            album_info = item.get("album") or {}
+            album = album_info.get("name", "Unknown Album") if isinstance(album_info, dict) else "Unknown Album"
+
+            duration_seconds = item.get("duration_seconds") or 0
+            video_id = item.get("videoId")
+
+            tracks.append(
+                Track(
+                    title=title,
+                    artists=artists or ["Unknown Artist"],
+                    album=album,
+                    duration_ms=int(duration_seconds) * 1000,
+                    video_id=video_id,
+                )
+            )
+
+        logger.info("Loaded %d liked songs from YouTube Music.", len(tracks))
+        return Playlist(
+            id="LM",
             name=name,
             description=description,
             source="YouTube Music",

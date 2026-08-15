@@ -79,3 +79,11 @@ class MusicProvider(Protocol):
             playlist_id: Target playlist ID.
         """
         ...
+
+    def get_liked_songs(self) -> Playlist:
+        """Fetch the authenticated user's liked / favorite songs library.
+
+        Returns:
+            A `Playlist` model populated with all liked tracks.
+        """
+        ...

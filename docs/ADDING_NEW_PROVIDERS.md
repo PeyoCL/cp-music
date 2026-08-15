@@ -80,6 +80,10 @@ class YourServiceClient:
     def clear_playlist(self, playlist_id: str) -> None:
         """Elimina todos los tracks de una playlist (usado en modo --sync)."""
         ...
+
+    def get_liked_songs(self) -> Playlist:
+        """Obtiene la biblioteca de canciones favoritas / 'me gusta' del usuario autenticado."""
+        ...
 ```
 
 Exporta el nuevo cliente en [`playlist_migrate/providers/__init__.py`](../playlist_migrate/providers/__init__.py).
