@@ -71,3 +71,23 @@ tests = []
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "strict"
+
+# ---------------------------------------------------------------------------
+# Coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["cpmusic"]
+# Exclude API client modules (require live credentials — integration tested separately)
+# and entry-point shims that have no testable logic.
+omit = [
+    "cpmusic/spotify_client.py",
+    "cpmusic/ytmusic_client.py",
+    "cpmusic/cli.py",
+    "cpmusic/__main__.py",
+]
+
+[tool.coverage.report]
+# Fail if testable core modules drop below 80%
+fail_under = 80
+show_missing = true
+skip_covered = false

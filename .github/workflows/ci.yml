@@ -104,7 +104,6 @@ jobs:
             --cov=cpmusic \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
-            --cov-fail-under=80 \
             -v
 
       - name: Upload coverage report
