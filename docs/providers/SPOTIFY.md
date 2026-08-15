@@ -1,6 +1,6 @@
 # Spotify — Configuración y Autenticación
 
-Esta guía cubre todo lo necesario para usar **Spotify** como proveedor origen o destino en `cp-music`.
+Esta guía cubre todo lo necesario para usar **Spotify** como proveedor origen o destino en `playlist-migrate`.
 
 ---
 
@@ -51,13 +51,12 @@ SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
 
 ## 3️⃣ Primer Login (PKCE — una sola vez)
 
-`cp-music` usa el flujo **PKCE** de Spotify: no necesitas copiar ni pegar URLs manualmente.
+`playlist-migrate` usa el flujo **PKCE** de Spotify: no necesitas copiar ni pegar URLs manualmente.
 
 La primera vez que ejecutes cualquier comando que use Spotify como origen o destino, el navegador se abrirá automáticamente para que autorices la app:
 
 ```bash
-uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
-    --source ytmusic --target spotify
+playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
 ```
 
 El flujo es:
@@ -71,7 +70,7 @@ Las siguientes ejecuciones reutilizan el token guardado automáticamente. El arc
 
 ## 🆔 Cómo Obtener el ID de una Playlist de Spotify
 
-El `PLAYLIST_ID` que necesita el comando `migrate` es el **ID alfanumérico** de la playlist, **no** la URL completa.
+El `PLAYLIST_ID` que necesita `playlist-migrate` es el **ID alfanumérico** de la playlist, **no** la URL completa.
 
 ### Opción A — Desde la app web
 1. Abre la playlist en [open.spotify.com](https://open.spotify.com).
@@ -94,28 +93,25 @@ El `PLAYLIST_ID` que necesita el comando `migrate` es el **ID alfanumérico** de
 
 ```bash
 # Migrar playlist de Spotify hacia YouTube Music
-uv run python -m cpmusic migrate "37i9dQZF1DXcBWIGoYBM5M" \
-    --source spotify --target ytmusic
+playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" --source spotify --target ytmusic
 
 # Migrar con nombre personalizado en destino
-uv run python -m cpmusic migrate "37i9dQZF1DXcBWIGoYBM5M" \
+playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" \
     --source spotify --target ytmusic \
     --name "Road Trip 2025"
 
 # Migrar desde YouTube Music hacia Spotify
-uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
-    --source ytmusic --target spotify
+playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
 
 # Sincronización exacta (borra lo que sobra en la playlist destino)
-uv run python -m cpmusic migrate "37i9dQZF1DXcBWIGoYBM5M" \
-    --source spotify --target ytmusic --sync
+playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" --source spotify --target ytmusic --sync
 ```
 
 ---
 
 ## 🔐 Permisos (Scopes) Solicitados
 
-`cp-music` solicita los siguientes permisos a Spotify:
+`playlist-migrate` solicita los siguientes permisos a Spotify:
 
 | Scope | Para qué se usa |
 |---|---|
@@ -140,5 +136,5 @@ Borra el archivo `.cache` en el directorio del proyecto y vuelve a ejecutar el c
 
 ```bash
 rm .cache
-uv run python -m cpmusic migrate ...
+playlist-migrate "PLAYLIST_ID" --source ... --target ...
 ```

@@ -1,6 +1,6 @@
 # Añadir un Nuevo Proveedor de Música
 
-`cp-music` fue diseñado desde el principio para ser extensible. Gracias al protocolo `MusicProvider`, puedes añadir soporte para cualquier servicio de streaming implementando una sola clase, sin modificar el core del migrador.
+`playlist-migrate` fue diseñado desde el principio para ser extensible. Gracias al protocolo `MusicProvider`, puedes añadir soporte para cualquier servicio de streaming implementando una sola clase, sin modificar el core del migrador.
 
 ---
 
@@ -16,14 +16,16 @@ El flujo de integración de un nuevo proveedor tiene 4 pasos:
 
 ## 1. Implementar el Protocolo `MusicProvider`
 
-El contrato que debe cumplir cualquier cliente está definido en [`cpmusic/interfaces.py`](../cpmusic/interfaces.py). Gracias a `typing.Protocol`, **no necesitas heredar** de ninguna clase base: solo debes implementar los métodos con las firmas correctas.
+El contrato que debe cumplir cualquier cliente está definido en [`playlist_migrate/interfaces.py`](../playlist_migrate/interfaces.py). Gracias a `typing.Protocol`, **no necesitas heredar** de ninguna clase base: solo debes implementar los métodos con las firmas correctas.
+
+Crea un nuevo archivo en `playlist_migrate/providers/`:
 
 ```python
-# cpmusic/providers/your_service.py
+# playlist_migrate/providers/your_service.py
 from __future__ import annotations
 
-from cpmusic.models import Playlist, Track
-from cpmusic.utils import with_retries
+from playlist_migrate.models import Playlist, Track
+from playlist_migrate.utils import with_retries
 
 
 class YourServiceClient:
@@ -80,9 +82,11 @@ class YourServiceClient:
         ...
 ```
 
+Exporta el nuevo cliente en [`playlist_migrate/providers/__init__.py`](../playlist_migrate/providers/__init__.py).
+
 ### Modelos Compartidos
 
-Usa siempre los modelos de [`cpmusic/models.py`](../cpmusic/models.py):
+Usa siempre los modelos de [`playlist_migrate/models.py`](../playlist_migrate/models.py):
 
 | Modelo | Campos clave |
 |---|---|
@@ -93,10 +97,10 @@ El campo `source` de `Playlist` debe ser el nombre legible del servicio (ej: `"M
 
 ### Manejo de Errores
 
-Usa las excepciones de [`cpmusic/exceptions.py`](../cpmusic/exceptions.py) para que el migrador pueda hacer retry automático:
+Usa las excepciones de [`playlist_migrate/exceptions.py`](../playlist_migrate/exceptions.py) para que el migrador pueda hacer retry automático:
 
 ```python
-from cpmusic.exceptions import NetworkError, RateLimitError
+from playlist_migrate.exceptions import NetworkError, RateLimitError
 
 # En tus métodos:
 if response.status_code == 429:
@@ -108,7 +112,7 @@ if response.status_code >= 500:
 Decora los métodos que hacen llamadas externas con `@with_retries`:
 
 ```python
-from cpmusic.utils import with_retries
+from playlist_migrate.utils import with_retries
 
 @with_retries(max_retries=3, base_delay=1.0)
 def search_track(self, track: Track) -> str | None:
@@ -119,40 +123,40 @@ def search_track(self, track: Track) -> str | None:
 
 ## 2. Registrar el Proveedor en la CLI
 
-Edita [`cpmusic/cli.py`](../cpmusic/cli.py) en la función `main()` para reconocer el nuevo proveedor:
+Edita [`playlist_migrate/cli.py`](../playlist_migrate/cli.py) en la función `main()` para reconocer el nuevo proveedor:
 
 ### 2a. Añadir al argumento `choices`
 
 ```python
-# En _build_parser(), busca los argumentos --source y --target
-migrate.add_argument(
+# En _add_migration_arguments(), busca los argumentos --source y --target
+p.add_argument(
     "--source",
-    required=True,
+    "-s",
     choices=["spotify", "ytmusic", "myservice"],  # ← añade aquí
-    ...
+    help="Source platform identifier.",
 )
-migrate.add_argument(
+p.add_argument(
     "--target",
-    required=True,
+    "-t",
     choices=["spotify", "ytmusic", "myservice"],  # ← y aquí
-    ...
+    help="Target platform identifier.",
 )
 ```
 
 ### 2b. Instanciar el cliente
 
 ```python
-# En main(), dentro del bloque elif args.command == "migrate":
+# En main():
 if "myservice" in (args.source, args.target):
-    from cpmusic.providers.your_service import YourServiceClient
+    from playlist_migrate.providers.your_service import YourServiceClient
 
     providers["myservice"] = YourServiceClient(api_key=os.getenv("MY_SERVICE_API_KEY"))
 ```
 
-Con esto, el comando ya es funcional:
+Con esto, el comando ya es funcional directamente:
 
 ```bash
-uv run python -m cpmusic migrate "PLAYLIST_ID" --source myservice --target spotify
+playlist-migrate "PLAYLIST_ID" --source myservice --target spotify
 ```
 
 ---
@@ -217,7 +221,7 @@ El documento debe cubrir:
 1. Requisitos previos y tipo de cuenta necesaria
 2. Pasos de autenticación (con capturas o instrucciones claras)
 3. Cómo obtener el ID de una playlist
-4. Ejemplos de uso con el comando `migrate`
+4. Ejemplos de uso con `playlist-migrate`
 5. Limitaciones conocidas de la API del servicio
 6. Solución de problemas comunes
 
@@ -228,13 +232,14 @@ Finalmente, añade el nuevo proveedor a la tabla de la sección **"Servicios Dis
 ## Checklist de Integración
 
 ```
-[ ] Clase que implementa todos los métodos de MusicProvider
+[ ] Clase en playlist_migrate/providers/<servicio>.py que implementa MusicProvider
+[ ] Exportado en playlist_migrate/providers/__init__.py
 [ ] Excepciones del proyecto (NetworkError, RateLimitError) en llamadas externas
 [ ] Decorator @with_retries en métodos con llamadas a APIs externas
 [ ] choices en --source y --target actualizados en cli.py
 [ ] Instanciación del cliente en main() de cli.py
 [ ] Fixture mock_<servicio> añadida en tests/conftest.py
-[ ] Tests de migración en ambas direcciones en test_migrator.py
+[ ] Tests unitarios mockeados en tests/test_<servicio>_provider.py
 [ ] Documentación en docs/providers/<SERVICIO>.md
 [ ] Tabla de "Servicios Disponibles" en README.md actualizada
 ```

@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cp-music"
-version = "0.2.0"
-description = "Bidirectional playlist migration between Spotify and YouTube Music"
+name = "playlist-migrate"
+version = "0.3.0"
+description = "Extensible playlist migration between streaming services"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -16,10 +16,11 @@ dependencies = [
 ]
 
 [project.scripts]
-# Primary entry-point (kept for backward compatibility)
-cpmusic = "cpmusic.cli:main"
-# Alias more descriptive of the tool's full scope
-cp-music = "cpmusic.cli:main"
+# Primary entry-point
+playlist-migrate = "playlist_migrate.cli:main"
+# Aliases for backward compatibility
+cpmusic = "playlist_migrate.cli:main"
+cp-music = "playlist_migrate.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -83,11 +84,11 @@ asyncio_mode = "strict"
 # Coverage
 # ---------------------------------------------------------------------------
 [tool.coverage.run]
-source = ["cpmusic"]
+source = ["playlist_migrate"]
 # Exclude CLI entry-point shims that have no testable logic.
 omit = [
-    "cpmusic/cli.py",
-    "cpmusic/__main__.py",
+    "playlist_migrate/cli.py",
+    "playlist_migrate/__main__.py",
 ]
 
 [tool.coverage.report]

@@ -1,5 +1,5 @@
 """
-test_migrator.py — Unit tests for cp-music.
+test_migrator.py — Unit tests for playlist-migrate.
 """
 
 from __future__ import annotations
@@ -8,15 +8,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from cpmusic.exceptions import NetworkError, RateLimitError
-from cpmusic.migrator import PlaylistMigrator
-from cpmusic.models import (
+from playlist_migrate.exceptions import NetworkError, RateLimitError
+from playlist_migrate.migrator import PlaylistMigrator
+from playlist_migrate.models import (
     MigrationResult,
     Playlist,
     SpotifyPlaylist,
     Track,
 )
-from cpmusic.providers import SpotifyClient, YTMusicClient
+from playlist_migrate.providers import SpotifyClient, YTMusicClient
 
 # ---------------------------------------------------------------------------
 # Helper factories

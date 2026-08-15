@@ -68,7 +68,7 @@ jobs:
         run: uv sync --dev
 
       - name: Bandit — static security analysis
-        run: uv run bandit -c pyproject.toml -r cpmusic/ --severity-level medium --confidence-level medium
+        run: uv run bandit -c pyproject.toml -r playlist_migrate/ --severity-level medium --confidence-level medium
 
       - name: pip-audit — dependency CVE scan
         run: uv run pip-audit
@@ -101,7 +101,7 @@ jobs:
       - name: Run pytest with coverage
         run: |
           uv run pytest tests/ \
-            --cov=cpmusic \
+            --cov=playlist_migrate \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             -v

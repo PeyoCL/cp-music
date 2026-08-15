@@ -1,5 +1,5 @@
 """
-models.py — Shared domain models for cp-music.
+models.py — Shared domain models for playlist-migrate.
 
 Defines the core data structures (Track, Playlist, MigrationResult) used
 by both the Spotify and YouTube Music clients, and by the migrator.

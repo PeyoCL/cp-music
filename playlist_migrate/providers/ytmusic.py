@@ -1,5 +1,5 @@
 """
-ytmusic.py — YouTube Music client for cp-music.
+ytmusic.py — YouTube Music client for playlist-migrate.
 
 Wraps ytmusicapi to provide operations conforming to MusicProvider:
 
@@ -15,7 +15,7 @@ Authentication:
     Instead, ytmusicapi authenticates using the request headers from a logged-in
     Chrome/Edge session exported as a cURL command.  Run:
 
-        python -m cpmusic setup-auth --from-file curl.txt
+        playlist-migrate setup-auth --from-file curl.txt
 
     once to generate ``headers_auth.json``, which is then reused for all
     subsequent operations.
@@ -34,7 +34,7 @@ from pathlib import Path
 
 from ytmusicapi import YTMusic
 
-from cpmusic.models import Playlist, Track
+from playlist_migrate.models import Playlist, Track
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,7 @@ class YTMusicClient:
                 "   3. Guarda el texto copiado:\n"
                 "      pbpaste > curl.txt\n"
                 "   4. Ejecuta de nuevo:\n"
-                "      python3 -m cpmusic setup-auth --from-file curl.txt"
+                "      playlist-migrate setup-auth --from-file curl.txt"
             )
             raise ValueError("Missing 'cookie' header. Cannot authenticate with YouTube Music.")
 

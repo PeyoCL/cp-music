@@ -1,5 +1,5 @@
 """
-spotify.py — Spotify API client for cp-music.
+spotify.py — Spotify API client for playlist-migrate.
 
 Handles authentication (OAuth2 PKCE for private playlists, Client Credentials
 fallback for public-only access) and provides operations to conform to MusicProvider:
@@ -29,7 +29,7 @@ import requests
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyPKCE
 
-from cpmusic.models import Playlist, Track
+from playlist_migrate.models import Playlist, Track
 
 logger = logging.getLogger(__name__)
 

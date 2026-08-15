@@ -1,6 +1,6 @@
 # YouTube Music — Configuración y Autenticación
 
-Esta guía cubre todo lo necesario para usar **YouTube Music** como proveedor origen o destino en `cp-music`.
+Esta guía cubre todo lo necesario para usar **YouTube Music** como proveedor origen o destino en `playlist-migrate`.
 
 ---
 
@@ -9,7 +9,7 @@ Esta guía cubre todo lo necesario para usar **YouTube Music** como proveedor or
 - Cuenta activa en [YouTube Music](https://music.youtube.com) (gratuita o Premium)
 - Acceso a un navegador basado en Chromium (Chrome, Edge, Brave)
 
-> **Nota**: YouTube Music **no tiene una API pública oficial** para terceros. `cp-music` utiliza [`ytmusicapi`](https://ytmusicapi.readthedocs.io/), que funciona mediante las cabeceras de autenticación de tu sesión activa en el navegador. Por eso el proceso de autenticación es distinto al de Spotify.
+> **Nota**: YouTube Music **no tiene una API pública oficial** para terceros. `playlist-migrate` utiliza [`ytmusicapi`](https://ytmusicapi.readthedocs.io/), que funciona mediante las cabeceras de autenticación de tu sesión activa en el navegador. Por eso el proceso de autenticación es distinto al de Spotify.
 
 ---
 
@@ -33,7 +33,7 @@ La autenticación con YouTube Music consiste en capturar las cabeceras HTTP de t
 **En macOS** (usando el portapapeles directamente):
 ```bash
 pbpaste > curl.txt
-uv run python -m cpmusic setup-auth --from-file curl.txt
+playlist-migrate setup-auth --from-file curl.txt
 ```
 
 **En Linux/Windows (WSL)**:
@@ -41,7 +41,7 @@ uv run python -m cpmusic setup-auth --from-file curl.txt
 # Pega el contenido del cURL en un archivo
 nano curl.txt  # pega y guarda
 
-uv run python -m cpmusic setup-auth --from-file curl.txt
+playlist-migrate setup-auth --from-file curl.txt
 ```
 
 **Salida esperada:**
@@ -65,17 +65,17 @@ Las cookies de YouTube Music tienen una duración limitada (generalmente varias 
 
 ```bash
 # El archivo existente se sobreescribe automáticamente
-uv run python -m cpmusic setup-auth --from-file curl.txt
+playlist-migrate setup-auth --from-file curl.txt
 ```
 
 Para usar un nombre de archivo o ruta diferente:
 ```bash
-uv run python -m cpmusic setup-auth --from-file curl.txt --output /ruta/custom/mis_headers.json
+playlist-migrate setup-auth --from-file curl.txt --output /ruta/custom/mis_headers.json
 ```
 
-Y luego usa `--auth-file` en el comando `migrate`:
+Y luego usa `--auth-file` al migrar:
 ```bash
-uv run python -m cpmusic migrate "PLxxx..." \
+playlist-migrate "PLxxx..." \
     --source ytmusic --target spotify \
     --auth-file /ruta/custom/mis_headers.json
 ```
@@ -84,7 +84,7 @@ uv run python -m cpmusic migrate "PLxxx..." \
 
 ## 🆔 Cómo Obtener el ID de una Playlist de YouTube Music
 
-El `PLAYLIST_ID` que necesita el comando `migrate` es el **ID alfanumérico** de la playlist, que comienza con `PL`.
+El `PLAYLIST_ID` que necesita `playlist-migrate` es el **ID alfanumérico** de la playlist, que comienza con `PL`.
 
 ### Opción A — Desde la web de YouTube Music
 1. Abre la playlist en [music.youtube.com](https://music.youtube.com).
@@ -114,25 +114,23 @@ El `PLAYLIST_ID` que necesita el comando `migrate` es el **ID alfanumérico** de
 
 ```bash
 # Migrar playlist de YouTube Music hacia Spotify
-uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
-    --source ytmusic --target spotify
+playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
 
 # Migrar desde Spotify hacia YouTube Music
-uv run python -m cpmusic migrate "37i9dQZF1DXcBWIGoYBM5M" \
-    --source spotify --target ytmusic
+playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" --source spotify --target ytmusic
 
 # Con nombre personalizado en destino
-uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
+playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
     --source ytmusic --target spotify \
     --name "Mis Favoritos"
 
 # Especificando una ruta distinta para headers_auth.json
-uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
+playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
     --source ytmusic --target spotify \
     --auth-file /Users/usuario/ytmusic_headers.json
 
 # Sincronización exacta
-uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
+playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
     --source ytmusic --target spotify --sync
 ```
 
@@ -144,7 +142,7 @@ uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
 |---|---|
 | **Sin API oficial** | La autenticación se basa en cookies de sesión del navegador, no en un token OAuth estándar |
 | **Sin subida de portadas** | La API de `ytmusicapi` no permite subir imágenes personalizadas a playlists (la portada se genera automáticamente por YouTube) |
-| **Rate Limits** | YouTube Music puede limitar peticiones muy frecuentes; `cp-music` maneja esto con *Exponential Backoff* automático |
+| **Rate Limits** | YouTube Music puede limitar peticiones muy frecuentes; `playlist-migrate` maneja esto con *Exponential Backoff* automático |
 | **Playlists privadas** | Solo puedes acceder a las playlists de la cuenta cuyas cookies se usaron para autenticarse |
 
 ---
@@ -154,7 +152,7 @@ uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
 ### `AuthError: headers_auth.json not found`
 El archivo de autenticación no existe o no está en la ruta esperada. Ejecuta:
 ```bash
-uv run python -m cpmusic setup-auth --from-file curl.txt
+playlist-migrate setup-auth --from-file curl.txt
 ```
 
 ### `KeyError: cookie` durante setup-auth
@@ -162,9 +160,3 @@ El cURL copiado no contiene una cookie válida de YouTube Music. Asegúrate de:
 1. Estar **iniciado sesión** en music.youtube.com antes de capturar el cURL.
 2. Capturar la petición **`browse`** específicamente (no otra petición de la página).
 3. Usar **"Copy as cURL (bash)"** y no otro formato.
-
-### Error `401 Unauthorized` durante la migración
-Las cookies han expirado. Repite el proceso de autenticación capturando un nuevo cURL desde el navegador.
-
-### Pista no encontrada en YouTube Music
-YouTube Music puede no tener disponible un track específico en tu región o el título puede diferir ligeramente. Los tracks no encontrados se reportan al final de la migración en la sección **"Unmatched"** del resumen.

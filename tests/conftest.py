@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from cpmusic.providers import SpotifyClient, YTMusicClient
+from playlist_migrate.providers import SpotifyClient, YTMusicClient
 
 
 @pytest.fixture

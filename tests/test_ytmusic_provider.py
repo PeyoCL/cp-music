@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cpmusic.models import Track
-from cpmusic.providers.ytmusic import YTMusicClient
+from playlist_migrate.models import Track
+from playlist_migrate.providers.ytmusic import YTMusicClient
 
 
 @pytest.fixture
@@ -17,8 +17,8 @@ def ytmusic_client_mocked() -> tuple[YTMusicClient, MagicMock]:
     """Creates a YTMusicClient instance with mocked ytmusicapi.YTMusic instance."""
     mock_yt = MagicMock()
     with (
-        patch("cpmusic.providers.ytmusic.Path.exists", return_value=True),
-        patch("cpmusic.providers.ytmusic.YTMusic", return_value=mock_yt),
+        patch("playlist_migrate.providers.ytmusic.Path.exists", return_value=True),
+        patch("playlist_migrate.providers.ytmusic.YTMusic", return_value=mock_yt),
     ):
         client = YTMusicClient(auth_filepath="dummy_headers.json")
         client.ytmusic = mock_yt
@@ -28,8 +28,8 @@ def ytmusic_client_mocked() -> tuple[YTMusicClient, MagicMock]:
 class TestYTMusicInitialization:
     def test_init_with_existing_auth_file(self) -> None:
         with (
-            patch("cpmusic.providers.ytmusic.Path.exists", return_value=True),
-            patch("cpmusic.providers.ytmusic.YTMusic") as mock_yt_cls,
+            patch("playlist_migrate.providers.ytmusic.Path.exists", return_value=True),
+            patch("playlist_migrate.providers.ytmusic.YTMusic") as mock_yt_cls,
         ):
             client = YTMusicClient(auth_filepath="headers_auth.json")
             mock_yt_cls.assert_called_once_with("headers_auth.json")
@@ -37,8 +37,8 @@ class TestYTMusicInitialization:
 
     def test_init_without_auth_file_fallback_to_read_only(self) -> None:
         with (
-            patch("cpmusic.providers.ytmusic.Path.exists", return_value=False),
-            patch("cpmusic.providers.ytmusic.YTMusic") as mock_yt_cls,
+            patch("playlist_migrate.providers.ytmusic.Path.exists", return_value=False),
+            patch("playlist_migrate.providers.ytmusic.YTMusic") as mock_yt_cls,
         ):
             client = YTMusicClient(auth_filepath="nonexistent.json")
             mock_yt_cls.assert_called_once_with()

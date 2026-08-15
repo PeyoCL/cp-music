@@ -1,5 +1,5 @@
 """
-migrator.py — Core orchestration for cp-music bidirectional playlist migration.
+migrator.py — Core orchestration for playlist-migrate bidirectional playlist migration.
 
 This module provides :class:`PlaylistMigrator`, which coordinates the full
 migration pipeline generically across any MusicProvider.
@@ -10,13 +10,13 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from cpmusic.interfaces import MusicProvider
-from cpmusic.models import (
+from playlist_migrate.interfaces import MusicProvider
+from playlist_migrate.models import (
     MigrationResult,
     Playlist,
     Track,
 )
-from cpmusic.utils import with_retries
+from playlist_migrate.utils import with_retries
 
 logger = logging.getLogger(__name__)
 

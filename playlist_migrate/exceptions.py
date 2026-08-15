@@ -1,5 +1,5 @@
 class CPMusicError(Exception):
-    """Base exception for all cp-music errors."""
+    """Base exception for all playlist-migrate errors."""
 
     pass
 

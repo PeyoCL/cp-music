@@ -7,7 +7,7 @@ client must implement to be supported by the PlaylistMigrator.
 
 from typing import Protocol
 
-from cpmusic.models import Playlist, Track
+from playlist_migrate.models import Playlist, Track
 
 
 class MusicProvider(Protocol):

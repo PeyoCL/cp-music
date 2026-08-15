@@ -1,9 +1,9 @@
-# cp-music 🎵↔️
+# playlist-migrate 🎵↔️
 
-Herramienta extensible en Python para **migrar listas de reproducción** entre servicios de música de forma bidireccional, agnóstica y con un único comando.
+Herramienta extensible en Python para **migrar listas de reproducción** entre servicios de música de forma directa, bidireccional y agnóstica.
 
 ```bash
-uv run python -m cpmusic migrate "PLAYLIST_ID" --source spotify --target ytmusic
+playlist-migrate "PLAYLIST_ID" --source spotify --target ytmusic
 ```
 
 ---
@@ -13,7 +13,7 @@ uv run python -m cpmusic migrate "PLAYLIST_ID" --source spotify --target ytmusic
 | Funcionalidad | Detalle |
 |---|---|
 | **Arquitectura extensible** | Protocolo `MusicProvider` — añade nuevos servicios sin tocar el core |
-| **Un solo comando** | `migrate --source X --target Y` — no importa la dirección |
+| **Uso directo sin subcomandos** | Especifica directamente la playlist origen, servicio origen y servicio destino |
 | **Búsqueda concurrente** | `asyncio` + búsquedas paralelas para migraciones ultra-rápidas |
 | **Detección de duplicados** | Matching por ISRC, ID nativo y Artista+Título |
 | **Modo `--sync`** | Sincronización exacta — el destino queda idéntico al origen |
@@ -37,11 +37,11 @@ uv run python -m cpmusic migrate "PLAYLIST_ID" --source spotify --target ytmusic
 ## 🏗️ Estructura del Proyecto
 
 ```
-cp-music/
-├── cpmusic/
+playlist-migrate/
+├── playlist_migrate/
 │   ├── __init__.py
-│   ├── __main__.py          # Entrada: python -m cpmusic
-│   ├── cli.py               # CLI: subcomando 'migrate' y 'setup-auth'
+│   ├── __main__.py          # Entrada: python -m playlist_migrate
+│   ├── cli.py               # CLI directa y comando 'setup-auth'
 │   ├── interfaces.py        # Protocolo MusicProvider (contrato para todos los servicios)
 │   ├── models.py            # Track, Playlist, MigrationResult (dataclasses con slots)
 │   ├── exceptions.py        # AuthError, NetworkError, RateLimitError
@@ -84,7 +84,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. Clonar el proyecto
 git clone <tu-repositorio>
-cd cp-music
+cd playlist-migrate
 
 # 3. Instalar dependencias con Python 3.14
 uv sync
@@ -103,12 +103,12 @@ Cada servicio de música requiere su propia autenticación. Consulta la document
 
 ## ⚡ Uso
 
-Todos los comandos se ejecutan con `uv run python -m cpmusic` (o simplemente `cpmusic` si instalaste el paquete).
+Puedes ejecutar la herramienta directamente con `uv run playlist-migrate` (o `uv run python -m playlist_migrate`):
 
-### Comando principal: `migrate`
+### Sintaxis Directa
 
 ```bash
-uv run python -m cpmusic migrate PLAYLIST_ID \
+playlist-migrate PLAYLIST_ID \
     --source <proveedor_origen> \
     --target <proveedor_destino> \
     [--name "Nombre Destino"] \
@@ -120,55 +120,53 @@ uv run python -m cpmusic migrate PLAYLIST_ID \
 
 ```bash
 # Spotify → YouTube Music
-uv run python -m cpmusic migrate "37i9dQZF1DXcBWIGoYBM5M" \
-    --source spotify --target ytmusic
+playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" --source spotify --target ytmusic
 
 # YouTube Music → Spotify
-uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
-    --source ytmusic --target spotify
+playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
 
 # Con nombre personalizado en el destino
-uv run python -m cpmusic migrate "37i9dQZF1DXcBWIGoYBM5M" \
+playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" \
     --source spotify --target ytmusic \
     --name "Mis Favoritos"
 
 # Modo sincronización exacta (borra lo que sobra en destino)
-uv run python -m cpmusic migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
+playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" \
     --source ytmusic --target spotify --sync
 ```
 
-### Opciones del comando `migrate`
+### Opciones de Migración
 
-| Opción | Descripción |
-|---|---|
-| `PLAYLIST_ID` | ID nativo de la playlist en el servicio origen |
-| `--source ID` | Proveedor origen (ej: `spotify`, `ytmusic`) |
-| `--target ID` | Proveedor destino (ej: `spotify`, `ytmusic`) |
-| `--name NAME` | Nombre personalizado para la playlist destino |
-| `--sync` | Reemplaza el contenido del destino para que sea idéntico al origen |
-| `--auth-file PATH` | Ruta al archivo `headers_auth.json` de YTMusic (default: directorio actual) |
-| `--verbose` / `-v` | Activa logging DEBUG detallado |
+| Opción | Alias | Descripción |
+|---|---|---|
+| `PLAYLIST_ID` | Posicional | ID nativo de la playlist en el servicio origen |
+| `--source ID` | `-s` | Proveedor origen (`spotify`, `ytmusic`) |
+| `--target ID` | `-t` | Proveedor destino (`spotify`, `ytmusic`) |
+| `--name NAME` | `-n` | Nombre personalizado para la playlist destino |
+| `--sync` | — | Reemplaza el contenido del destino para que sea idéntico al origen |
+| `--auth-file PATH` | — | Ruta al archivo `headers_auth.json` de YTMusic (default: `headers_auth.json`) |
+| `--verbose` | `-v` | Activa logging DEBUG detallado |
 
 ---
 
 ## 🧪 Tests y Calidad de Código
 
 ```bash
-# Ejecutar suite de tests
+# Ejecutar suite completa de tests
 uv run pytest tests/
 
 # Con reporte de cobertura
-uv run pytest --cov=cpmusic --cov-report=term-missing
+uv run pytest --cov=playlist_migrate --cov-report=term-missing
 
 # Linter y formatter
 uv run ruff check --fix .
 uv run ruff format .
 
-# Análisis de seguridad estático
-uv run bandit -c pyproject.toml -r cpmusic/
+# Análisis de seguridad estático (Bandit)
+uv run bandit -c pyproject.toml -r playlist_migrate/
 
-# Auditoría de vulnerabilidades en dependencias
-uv tool run pip-audit
+# Auditoría de vulnerabilidades en dependencias (pip-audit)
+uv run pip-audit
 
 # Ejecutar todos los hooks de calidad (igual que en git commit)
 uv tool run pre-commit run --all-files

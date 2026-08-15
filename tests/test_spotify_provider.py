@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cpmusic.models import Track
-from cpmusic.providers.spotify import SpotifyClient
+from playlist_migrate.models import Track
+from playlist_migrate.providers.spotify import SpotifyClient
 
 
 @pytest.fixture
@@ -18,8 +18,8 @@ def spotify_client_mocked() -> tuple[SpotifyClient, MagicMock]:
     mock_sp = MagicMock()
     with (
         patch.dict("os.environ", {"SPOTIPY_CLIENT_ID": "mock_id", "SPOTIPY_CLIENT_SECRET": "mock_secret"}),
-        patch("cpmusic.providers.spotify.SpotifyPKCE"),
-        patch("cpmusic.providers.spotify.spotipy.Spotify", return_value=mock_sp),
+        patch("playlist_migrate.providers.spotify.SpotifyPKCE"),
+        patch("playlist_migrate.providers.spotify.spotipy.Spotify", return_value=mock_sp),
     ):
         client = SpotifyClient(client_id="mock_id", client_secret="mock_secret")
         client.sp = mock_sp
@@ -37,8 +37,8 @@ class TestSpotifyAuth:
     def test_pkce_auth_success(self) -> None:
         with (
             patch.dict("os.environ", {"SPOTIPY_CLIENT_ID": "id", "SPOTIPY_CLIENT_SECRET": "secret"}),
-            patch("cpmusic.providers.spotify.SpotifyPKCE") as mock_pkce,
-            patch("cpmusic.providers.spotify.spotipy.Spotify") as mock_spotify_cls,
+            patch("playlist_migrate.providers.spotify.SpotifyPKCE") as mock_pkce,
+            patch("playlist_migrate.providers.spotify.spotipy.Spotify") as mock_spotify_cls,
         ):
             client = SpotifyClient()
             mock_pkce.assert_called_once()
@@ -48,9 +48,9 @@ class TestSpotifyAuth:
     def test_pkce_failure_falls_back_to_client_credentials(self) -> None:
         with (
             patch.dict("os.environ", {"SPOTIPY_CLIENT_ID": "id", "SPOTIPY_CLIENT_SECRET": "secret"}),
-            patch("cpmusic.providers.spotify.SpotifyPKCE", side_effect=Exception("PKCE failed")),
-            patch("cpmusic.providers.spotify.SpotifyClientCredentials") as mock_cc,
-            patch("cpmusic.providers.spotify.spotipy.Spotify") as mock_spotify_cls,
+            patch("playlist_migrate.providers.spotify.SpotifyPKCE", side_effect=Exception("PKCE failed")),
+            patch("playlist_migrate.providers.spotify.SpotifyClientCredentials") as mock_cc,
+            patch("playlist_migrate.providers.spotify.spotipy.Spotify") as mock_spotify_cls,
         ):
             client = SpotifyClient()
             mock_cc.assert_called_once_with(client_id="id", client_secret="secret")
@@ -259,7 +259,7 @@ class TestSpotifyWriteOperations:
         mock_response = MagicMock()
         mock_response.content = b"fake_image_bytes"
 
-        with patch("cpmusic.providers.spotify.requests.get", return_value=mock_response) as mock_get:
+        with patch("playlist_migrate.providers.spotify.requests.get", return_value=mock_response) as mock_get:
             client.upload_cover_image("pl_123", "https://example.com/cover.jpg")
 
             mock_get.assert_called_once_with(

@@ -4,7 +4,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
-from cpmusic.exceptions import NetworkError, RateLimitError
+from playlist_migrate.exceptions import NetworkError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
