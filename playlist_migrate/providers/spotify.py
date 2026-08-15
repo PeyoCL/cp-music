@@ -29,6 +29,12 @@ import requests
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyPKCE
 
+from playlist_migrate.exceptions import (
+    PlaylistCreationError,
+    PlaylistFetchError,
+    PlaylistModificationError,
+    SpotifyAuthError,
+)
 from playlist_migrate.models import Playlist, Track
 
 logger = logging.getLogger(__name__)
@@ -80,7 +86,7 @@ class SpotifyClient:
         Falls back to Client Credentials (public playlists only) on failure.
         """
         if not (self.client_id and self.client_secret):
-            raise RuntimeError(
+            raise SpotifyAuthError(
                 "Missing Spotify credentials. Set SPOTIPY_CLIENT_ID and SPOTIPY_CLIENT_SECRET in your .env file."
             )
 
@@ -167,7 +173,7 @@ class SpotifyClient:
         try:
             raw = self.sp.playlist(playlist_id, additional_types=("track",))
         except Exception as err:
-            raise RuntimeError(f"Failed to fetch Spotify playlist '{playlist_id}': {err}") from err
+            raise PlaylistFetchError(f"Failed to fetch Spotify playlist '{playlist_id}': {err}") from err
 
         name = raw.get("name", "Migrated Playlist")
         description = raw.get("description", "") or "Migrated from Spotify"
@@ -349,7 +355,7 @@ class SpotifyClient:
             RuntimeError: If the API call fails.
         """
         if not self.sp:
-            raise RuntimeError("Spotify client is not authenticated.")
+            raise SpotifyAuthError("Spotify client is not authenticated.")
 
         try:
             user_id = self.sp.me()["id"]
@@ -363,7 +369,7 @@ class SpotifyClient:
             logger.info("Created Spotify playlist '%s' (ID: %s).", title, playlist_id)
             return playlist_id
         except Exception as err:
-            raise RuntimeError(f"Failed to create Spotify playlist '{title}': {err}") from err
+            raise PlaylistCreationError(f"Failed to create Spotify playlist '{title}': {err}") from err
 
     def add_tracks(
         self,
@@ -381,10 +387,11 @@ class SpotifyClient:
             chunk_size:  Batch size (max 100 per Spotify API limit).
 
         Raises:
-            RuntimeError: If any batch fails to be added.
+            SpotifyAuthError: If client is not authenticated.
+            PlaylistModificationError: If any batch fails to be added.
         """
         if not self.sp:
-            raise RuntimeError("Spotify client is not authenticated.")
+            raise SpotifyAuthError("Spotify client is not authenticated.")
 
         for i in range(0, len(track_ids), chunk_size):
             chunk = track_ids[i : i + chunk_size]
@@ -396,22 +403,28 @@ class SpotifyClient:
                     playlist_id,
                 )
             except Exception as err:
-                raise RuntimeError(f"Failed to add track batch to Spotify playlist {playlist_id}: {err}") from err
+                raise PlaylistModificationError(
+                    f"Failed to add track batch to Spotify playlist {playlist_id}: {err}"
+                ) from err
 
     def clear_playlist(self, playlist_id: str) -> None:
         """Remove all tracks from a Spotify playlist by replacing it with an empty list.
 
         Args:
             playlist_id: Target Spotify playlist ID.
+
+        Raises:
+            SpotifyAuthError: If client is not authenticated.
+            PlaylistModificationError: If clearing fails.
         """
         if not self.sp:
-            raise RuntimeError("Spotify client is not authenticated.")
+            raise SpotifyAuthError("Spotify client is not authenticated.")
 
         try:
             self.sp.playlist_replace_items(playlist_id, [])
             logger.info("Cleared Spotify playlist %s.", playlist_id)
         except Exception as err:
-            raise RuntimeError(f"Failed to clear Spotify playlist {playlist_id}: {err}") from err
+            raise PlaylistModificationError(f"Failed to clear Spotify playlist {playlist_id}: {err}") from err
 
     def replace_tracks(self, playlist_id: str, track_uris: list[str]) -> None:
         """Replace all tracks in a Spotify playlist with the given URIs.
@@ -422,9 +435,13 @@ class SpotifyClient:
         Args:
             playlist_id: Target Spotify playlist ID.
             track_uris:  List of ``spotify:track:<id>`` URIs to set.
+
+        Raises:
+            SpotifyAuthError: If client is not authenticated.
+            PlaylistModificationError: If replacement fails.
         """
         if not self.sp:
-            raise RuntimeError("Spotify client is not authenticated.")
+            raise SpotifyAuthError("Spotify client is not authenticated.")
 
         if not track_uris:
             # If empty, just replace with an empty list
@@ -439,7 +456,9 @@ class SpotifyClient:
                 "Replaced items in Spotify playlist %s with first batch of %d tracks.", playlist_id, len(first_batch)
             )
         except Exception as err:
-            raise RuntimeError(f"Failed to replace tracks in Spotify playlist {playlist_id}: {err}") from err
+            raise PlaylistModificationError(
+                f"Failed to replace tracks in Spotify playlist {playlist_id}: {err}"
+            ) from err
 
         # Add the rest in batches
         if len(track_uris) > 100:
@@ -451,9 +470,12 @@ class SpotifyClient:
         Args:
             playlist_id: Target Spotify playlist ID.
             image_url: URL of the source image.
+
+        Raises:
+            SpotifyAuthError: If client is not authenticated.
         """
         if not self.sp:
-            raise RuntimeError("Spotify client is not authenticated.")
+            raise SpotifyAuthError("Spotify client is not authenticated.")
 
         try:
             response = requests.get(image_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)

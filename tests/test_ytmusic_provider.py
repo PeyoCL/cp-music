@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from playlist_migrate.exceptions import PlaylistFetchError, YTMusicAuthError
 from playlist_migrate.models import Track
 from playlist_migrate.providers.ytmusic import YTMusicClient
 
@@ -73,7 +74,7 @@ class TestYTMusicHeadersParsingAndSetup:
 
     def test_setup_headers_auth_missing_cookie_raises_error(self) -> None:
         raw_input = "user-agent: Mozilla/5.0\naccept: text/html"
-        with pytest.raises(ValueError, match="Missing 'cookie' header"):
+        with pytest.raises(YTMusicAuthError, match="Missing 'cookie' header"):
             YTMusicClient.setup_headers_auth(output_filepath="out.json", raw_input=raw_input)
 
 
@@ -121,7 +122,7 @@ class TestYTMusicGetPlaylist:
         client, mock_yt = ytmusic_client_mocked
         mock_yt.get_playlist.side_effect = Exception("Playlist not accessible")
 
-        with pytest.raises(RuntimeError, match="Failed to fetch YTMusic playlist"):
+        with pytest.raises(PlaylistFetchError, match="Failed to fetch YTMusic playlist"):
             client.get_playlist("PL_INVALID")
 
 

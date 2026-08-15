@@ -20,11 +20,24 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from playlist_migrate.exceptions import (
+    AuthError,
+    NetworkError,
+    PlaylistError,
+    PlaylistMigrateError,
+    RateLimitError,
+)
 from playlist_migrate.interfaces import MusicProvider
 from playlist_migrate.migrator import PlaylistMigrator
 from playlist_migrate.providers import SpotifyClient, YTMusicClient
 
 logger = logging.getLogger(__name__)
+
+BANNER = r"""
+   ╭───►───╮   playlist-migrate
+  │   ♫ ♪   │  https://github.com/PeyoCL/playlist-migrate
+   ╰───◄───╯
+"""
 
 
 def _add_migration_arguments(p: argparse.ArgumentParser) -> None:
@@ -121,6 +134,7 @@ def _configure_logging(verbose: bool) -> None:
 
 def main(args_list: list[str] | None = None) -> None:
     """CLI entry point — called by ``python -m playlist_migrate`` or ``playlist-migrate``."""
+    print(BANNER)
     load_dotenv()
     raw_args = sys.argv[1:] if args_list is None else args_list
 
@@ -137,7 +151,11 @@ def main(args_list: list[str] | None = None) -> None:
                 sys.exit(1)
             raw_text = input_path.read_text(encoding="utf-8")
 
-        YTMusicClient.setup_headers_auth(output_filepath=args.output, raw_input=raw_text)
+        try:
+            YTMusicClient.setup_headers_auth(output_filepath=args.output, raw_input=raw_text)
+        except AuthError as err:
+            print(f"❌ Authentication setup failed: {err}")
+            sys.exit(1)
         sys.exit(0)
 
     parser = _build_parser()
@@ -156,20 +174,25 @@ def main(args_list: list[str] | None = None) -> None:
 
     providers: dict[str, MusicProvider] = {}
 
-    # Initialize only required clients
-    if "spotify" in (args.source, args.target):
-        providers["spotify"] = SpotifyClient()
+    try:
+        # Initialize only required clients
+        if "spotify" in (args.source, args.target):
+            providers["spotify"] = SpotifyClient()
 
-    if "ytmusic" in (args.source, args.target):
-        auth_file = Path(args.auth_file)
-        if not auth_file.exists():
-            print(
-                f"⚠️  Auth file '{args.auth_file}' not found.\n"
-                "Run 'playlist-migrate setup-auth' first to authenticate "
-                "your YouTube Music account."
-            )
-            sys.exit(1)
-        providers["ytmusic"] = YTMusicClient(auth_filepath=args.auth_file)
+        if "ytmusic" in (args.source, args.target):
+            auth_file = Path(args.auth_file)
+            if not auth_file.exists():
+                print(
+                    f"⚠️  Auth file '{args.auth_file}' not found.\n"
+                    "Run 'playlist-migrate setup-auth' first to authenticate "
+                    "your YouTube Music account."
+                )
+                sys.exit(1)
+            providers["ytmusic"] = YTMusicClient(auth_filepath=args.auth_file)
+    except AuthError as err:
+        logger.error("Authentication failed: %s", err)
+        print(f"❌ Auth Error: {err}")
+        sys.exit(1)
 
     migrator = PlaylistMigrator(providers)
 
@@ -183,8 +206,25 @@ def main(args_list: list[str] | None = None) -> None:
                 sync=args.sync,
             )
         )
+    except RateLimitError as err:
+        logger.error("Rate limit reached: %s", err)
+        print(f"⏳ Rate Limit Exceeded: {err}")
+        sys.exit(1)
+    except NetworkError as err:
+        logger.error("Network error: %s", err)
+        print(f"🌐 Network Error: {err}")
+        sys.exit(1)
+    except PlaylistError as err:
+        logger.error("Playlist operation failed: %s", err)
+        print(f"📋 Playlist Error: {err}")
+        sys.exit(1)
+    except PlaylistMigrateError as err:
+        logger.error("Migration domain error: %s", err)
+        print(f"❌ Error: {err}")
+        sys.exit(1)
     except Exception as err:
-        logger.error("Migration failed: %s", err)
+        logger.error("Unexpected error during migration: %s", err)
+        print(f"❌ Unexpected Error: {err}")
         sys.exit(1)
 
 

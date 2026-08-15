@@ -9,6 +9,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from playlist_migrate.cli import _build_parser, _build_setup_auth_parser, main
+from playlist_migrate.exceptions import (
+    AuthError,
+    NetworkError,
+    PlaylistError,
+    RateLimitError,
+)
 
 
 class TestCLIParser:
@@ -41,6 +47,13 @@ class TestCLIParser:
 
 
 class TestCLIExecution:
+    def test_banner_displayed_on_run(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with patch("sys.argv", ["playlist-migrate"]), pytest.raises(SystemExit):
+            main()
+        captured = capsys.readouterr()
+        assert "playlist-migrate" in captured.out
+        assert "https://github.com/PeyoCL/playlist-migrate" in captured.out
+
     def test_missing_arguments_exits_with_error(self) -> None:
         with patch("sys.argv", ["playlist-migrate"]), pytest.raises(SystemExit) as exc_info:
             main()
@@ -68,6 +81,19 @@ class TestCLIExecution:
         assert exc_info.value.code == 0
         mock_setup_auth.assert_called_once_with(output_filepath="headers_auth.json", raw_input="cookie: session=123")
 
+    def test_setup_auth_failure_handles_autherror(self, tmp_path) -> None:
+        curl_file = tmp_path / "curl.txt"
+        curl_file.write_text("no cookie here", encoding="utf-8")
+
+        with (
+            patch("sys.argv", ["playlist-migrate", "setup-auth", "--from-file", str(curl_file)]),
+            patch("playlist_migrate.cli.YTMusicClient.setup_headers_auth", side_effect=AuthError("Missing cookie")),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        assert exc_info.value.code == 1
+
     def test_direct_migration_success(self) -> None:
         mock_migrator = MagicMock()
         mock_migrator.migrate = AsyncMock()
@@ -88,3 +114,51 @@ class TestCLIExecution:
                 target_name=None,
                 sync=False,
             )
+
+    def test_migration_rate_limit_error_handled(self) -> None:
+        mock_migrator = MagicMock()
+        mock_migrator.migrate = AsyncMock(side_effect=RateLimitError("429 Too Many Requests"))
+
+        with (
+            patch("sys.argv", ["playlist-migrate", "PL_123", "-s", "spotify", "-t", "ytmusic"]),
+            patch("playlist_migrate.cli.SpotifyClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.YTMusicClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.Path.exists", return_value=True),
+            patch("playlist_migrate.cli.PlaylistMigrator", return_value=mock_migrator),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        assert exc_info.value.code == 1
+
+    def test_migration_network_error_handled(self) -> None:
+        mock_migrator = MagicMock()
+        mock_migrator.migrate = AsyncMock(side_effect=NetworkError("Connection timed out"))
+
+        with (
+            patch("sys.argv", ["playlist-migrate", "PL_123", "-s", "spotify", "-t", "ytmusic"]),
+            patch("playlist_migrate.cli.SpotifyClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.YTMusicClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.Path.exists", return_value=True),
+            patch("playlist_migrate.cli.PlaylistMigrator", return_value=mock_migrator),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        assert exc_info.value.code == 1
+
+    def test_migration_playlist_error_handled(self) -> None:
+        mock_migrator = MagicMock()
+        mock_migrator.migrate = AsyncMock(side_effect=PlaylistError("Playlist not found"))
+
+        with (
+            patch("sys.argv", ["playlist-migrate", "PL_123", "-s", "spotify", "-t", "ytmusic"]),
+            patch("playlist_migrate.cli.SpotifyClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.YTMusicClient", return_value=MagicMock()),
+            patch("playlist_migrate.cli.Path.exists", return_value=True),
+            patch("playlist_migrate.cli.PlaylistMigrator", return_value=mock_migrator),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            main()
+
+        assert exc_info.value.code == 1

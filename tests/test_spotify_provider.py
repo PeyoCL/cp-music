@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from playlist_migrate.exceptions import PlaylistFetchError, SpotifyAuthError
 from playlist_migrate.models import Track
 from playlist_migrate.providers.spotify import SpotifyClient
 
@@ -30,7 +31,7 @@ class TestSpotifyAuth:
     def test_missing_credentials_raises_error(self) -> None:
         with (
             patch.dict("os.environ", {}, clear=True),
-            pytest.raises(RuntimeError, match="Missing Spotify credentials"),
+            pytest.raises(SpotifyAuthError, match="Missing Spotify credentials"),
         ):
             SpotifyClient(client_id=None, client_secret=None)
 
@@ -156,7 +157,7 @@ class TestSpotifyGetPlaylist:
         client, mock_sp = spotify_client_mocked
         mock_sp.playlist.side_effect = Exception("Not found")
 
-        with pytest.raises(RuntimeError, match="Failed to fetch Spotify playlist"):
+        with pytest.raises(PlaylistFetchError, match="Failed to fetch Spotify playlist"):
             client.get_playlist("invalid_id")
 
 

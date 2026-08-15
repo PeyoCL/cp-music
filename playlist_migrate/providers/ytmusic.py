@@ -34,6 +34,11 @@ from pathlib import Path
 
 from ytmusicapi import YTMusic
 
+from playlist_migrate.exceptions import (
+    PlaylistFetchError,
+    PlaylistModificationError,
+    YTMusicAuthError,
+)
 from playlist_migrate.models import Playlist, Track
 
 logger = logging.getLogger(__name__)
@@ -180,14 +185,14 @@ class YTMusicClient:
                 "   4. Ejecuta de nuevo:\n"
                 "      playlist-migrate setup-auth --from-file curl.txt"
             )
-            raise ValueError("Missing 'cookie' header. Cannot authenticate with YouTube Music.")
+            raise YTMusicAuthError("Missing 'cookie' header. Cannot authenticate with YouTube Music.")
 
         print(f"✅ Cookie encontrada. Generando '{output_filepath}' via ytmusicapi...")
         try:
             setup_browser(filepath=output_filepath, headers_raw=raw_input)
             print(f"✅ Autenticación guardada exitosamente en '{output_filepath}'.")
         except Exception as err:
-            raise RuntimeError(f"ytmusicapi setup_browser failed: {err}") from err
+            raise YTMusicAuthError(f"ytmusicapi setup_browser failed: {err}") from err
 
     # ------------------------------------------------------------------
     # Read operations (used when migrating Spotify → YTMusic)
@@ -280,12 +285,12 @@ class YTMusicClient:
             RuntimeError: If the playlist cannot be fetched.
         """
         if not self.ytmusic:
-            raise RuntimeError("YTMusic client is not initialized. Run setup-auth first.")
+            raise YTMusicAuthError("YTMusic client is not initialized. Run setup-auth first.")
 
         try:
             raw = self.ytmusic.get_playlist(playlistId=playlist_id, limit=None)
         except Exception as err:
-            raise RuntimeError(f"Failed to fetch YTMusic playlist '{playlist_id}': {err}") from err
+            raise PlaylistFetchError(f"Failed to fetch YTMusic playlist '{playlist_id}': {err}") from err
 
         name = raw.get("title", "Migrated Playlist")
         description = raw.get("description", "") or "Migrated from YouTube Music"
@@ -402,7 +407,7 @@ class YTMusicClient:
             RuntimeError: If the client is not authenticated or the API fails.
         """
         if not self.ytmusic:
-            raise RuntimeError("YTMusic client is not authenticated.")
+            raise YTMusicAuthError("YTMusic client is not authenticated.")
 
         playlist_id = self.ytmusic.create_playlist(title=title, description=description)
         logger.info("Created YTMusic playlist '%s' (ID: %s).", title, playlist_id)
@@ -422,10 +427,11 @@ class YTMusicClient:
             chunk_size:  Batch size (ytmusicapi recommends ≤ 50 per call).
 
         Raises:
-            RuntimeError: If the client is not authenticated or a batch fails.
+            YTMusicAuthError: If client is not authenticated.
+            PlaylistModificationError: If a batch fails to be added.
         """
         if not self.ytmusic:
-            raise RuntimeError("YTMusic client is not authenticated.")
+            raise YTMusicAuthError("YTMusic client is not authenticated.")
 
         for i in range(0, len(track_ids), chunk_size):
             chunk = track_ids[i : i + chunk_size]
@@ -437,7 +443,9 @@ class YTMusicClient:
                     playlist_id,
                 )
             except Exception as err:
-                raise RuntimeError(f"Failed to add track batch to YTMusic playlist {playlist_id}: {err}") from err
+                raise PlaylistModificationError(
+                    f"Failed to add track batch to YTMusic playlist {playlist_id}: {err}"
+                ) from err
 
     def clear_playlist(self, playlist_id: str) -> None:
         """Remove all tracks from a YouTube Music playlist.
@@ -446,10 +454,11 @@ class YTMusicClient:
             playlist_id: Target playlist ID.
 
         Raises:
-            RuntimeError: If the client is not authenticated or the API fails.
+            YTMusicAuthError: If client is not authenticated.
+            PlaylistModificationError: If clearing fails.
         """
         if not self.ytmusic:
-            raise RuntimeError("YTMusic client is not authenticated.")
+            raise YTMusicAuthError("YTMusic client is not authenticated.")
 
         try:
             raw = self.ytmusic.get_playlist(playlistId=playlist_id, limit=None)
@@ -465,4 +474,4 @@ class YTMusicClient:
             else:
                 logger.info("YTMusic playlist %s is already empty.", playlist_id)
         except Exception as err:
-            raise RuntimeError(f"Failed to clear YTMusic playlist {playlist_id}: {err}") from err
+            raise PlaylistModificationError(f"Failed to clear YTMusic playlist {playlist_id}: {err}") from err

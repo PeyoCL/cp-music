@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from playlist_migrate.exceptions import ProviderNotFoundError
 from playlist_migrate.interfaces import MusicProvider
 from playlist_migrate.models import (
     MigrationResult,
@@ -62,9 +63,9 @@ class PlaylistMigrator:
         target_provider = self.providers.get(target_id)
 
         if not source_provider:
-            raise ValueError(f"Source provider '{source_id}' not found.")
+            raise ProviderNotFoundError(f"Source provider '{source_id}' not found.")
         if not target_provider:
-            raise ValueError(f"Target provider '{target_id}' not found.")
+            raise ProviderNotFoundError(f"Target provider '{target_id}' not found.")
 
         source: Playlist = source_provider.get_playlist(playlist_identifier)
         dest_name = target_name or source.name
