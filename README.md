@@ -26,6 +26,9 @@ playlist-migrate "PLAYLIST_ID" --source spotify --target ytmusic
 |---|---|
 | **Arquitectura extensible** | Protocolo `MusicProvider` — añade nuevos servicios sin tocar el core |
 | **Uso directo sin subcomandos** | Especifica directamente la playlist origen, servicio origen y servicio destino |
+| **Sincronización de Favoritos** | Migra bibliotecas de "Tus me gusta" / "Música que te gusta" con `--liked-songs-pl` (`-lsp`) |
+| **Matching Inteligente** | Algoritmo de scoring de candidatos multi-criterio (título, artista, duración, ISRC) |
+| **Limpieza de Ruido** | Normalización de texto y eliminación de sufijos (`- Remastered`, `(Live)`, `feat.`, etc.) |
 | **Búsqueda concurrente** | `asyncio` + búsquedas paralelas para migraciones ultra-rápidas |
 | **Detección de duplicados** | Matching por ISRC, ID nativo y Artista+Título |
 | **Modo `--sync`** | Sincronización exacta — el destino queda idéntico al origen |
@@ -37,10 +40,10 @@ playlist-migrate "PLAYLIST_ID" --source spotify --target ytmusic
 
 ## 📦 Servicios Disponibles
 
-| Icono | Servicio | ID CLI | Estado | Documentación |
-|:---:|---|---|---|---|
-| 🟢 | **Spotify** | `spotify` | ✅ Disponible | [docs/providers/SPOTIFY.md](./docs/providers/SPOTIFY.md) |
-| 🔴 | **YouTube Music** | `ytmusic` | ✅ Disponible | [docs/providers/YTMUSIC.md](./docs/providers/YTMUSIC.md) |
+| Servicio | ID CLI | Estado | Documentación |
+|---|---|---|---|
+| **Spotify** | `spotify` | ✅ Disponible | [docs/providers/SPOTIFY.md](./docs/providers/SPOTIFY.md) |
+| **YouTube Music** | `ytmusic` | ✅ Disponible | [docs/providers/YTMUSIC.md](./docs/providers/YTMUSIC.md) |
 
 > ¿Quieres añadir un nuevo servicio? Consulta la guía para desarrolladores en [`docs/ADDING_NEW_PROVIDERS.md`](./docs/ADDING_NEW_PROVIDERS.md).
 
@@ -59,7 +62,8 @@ playlist-migrate/
 │   ├── cli.py               # CLI directa y comando 'setup-auth'
 │   ├── interfaces.py        # Protocolo MusicProvider (contrato para todos los servicios)
 │   ├── models.py            # Track, Playlist, MigrationResult (dataclasses con slots)
-│   ├── exceptions.py        # CPMusicError, AuthError, NetworkError, RateLimitError
+│   ├── matching.py          # Normalización de texto y scoring de candidatos
+│   ├── exceptions.py        # Jerarquía completa de excepciones de dominio
 │   ├── utils.py             # Decorador @with_retries (Exponential Backoff)
 │   ├── migrator.py          # Orquestador genérico: fuente → destino
 │   └── providers/           # Clientes modulares de servicios de música
@@ -74,12 +78,15 @@ playlist-migrate/
 ├── tests/
 │   ├── conftest.py               # Fixtures pytest (mocks de proveedores)
 │   ├── test_cli.py               # Tests del CLI y sintaxis directa
+│   ├── test_matching.py          # Tests de normalización, limpieza y scoring
 │   ├── test_migrator.py          # Tests del orquestador migrador (asyncio)
 │   ├── test_spotify_provider.py  # Tests unitarios mockeados de Spotify
 │   └── test_ytmusic_provider.py  # Tests unitarios mockeados de YouTube Music
 ├── .pre-commit-config.yaml  # Hooks de calidad y seguridad
 ├── .env.example
 ├── pyproject.toml           # uv, Ruff, Bandit, pytest
+├── LICENSE                  # Licencia MIT
+├── SECURITY.md              # Política de seguridad y reporte de vulnerabilidades
 └── README.md
 ```
 
