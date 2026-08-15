@@ -18,7 +18,7 @@ Esta guía cubre todo lo necesario para usar **Spotify** como proveedor origen o
 1. Ingresa a [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) e inicia sesión.
 2. Haz clic en **"Create app"**.
 3. Completa el formulario:
-   - **App name**: `cp-music` (o el nombre que prefieras)
+   - **App name**: `playlist-migrate` (o el nombre que prefieras)
    - **App description**: `Playlist migration tool`
    - **Redirect URIs**: Agrega exactamente `http://127.0.0.1:8888/callback`
    - **APIs used**: selecciona `Web API`

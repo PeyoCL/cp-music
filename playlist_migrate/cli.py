@@ -140,10 +140,6 @@ def main(args_list: list[str] | None = None) -> None:
         YTMusicClient.setup_headers_auth(output_filepath=args.output, raw_input=raw_text)
         sys.exit(0)
 
-    # Optional alias: strip 'migrate' if passed as first arg
-    if raw_args and raw_args[0] == "migrate":
-        raw_args = raw_args[1:]
-
     parser = _build_parser()
     args = parser.parse_args(raw_args)
 

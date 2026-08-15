@@ -16,11 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-# Primary entry-point
 playlist-migrate = "playlist_migrate.cli:main"
-# Aliases for backward compatibility
-cpmusic = "playlist_migrate.cli:main"
-cp-music = "playlist_migrate.cli:main"
 
 [project.optional-dependencies]
 dev = [

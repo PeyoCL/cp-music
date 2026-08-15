@@ -88,24 +88,3 @@ class TestCLIExecution:
                 target_name=None,
                 sync=False,
             )
-
-    def test_backward_compatible_migrate_alias(self) -> None:
-        mock_migrator = MagicMock()
-        mock_migrator.migrate = AsyncMock()
-
-        with (
-            patch("sys.argv", ["playlist-migrate", "migrate", "PL_123", "-s", "ytmusic", "-t", "spotify"]),
-            patch("playlist_migrate.cli.SpotifyClient", return_value=MagicMock()),
-            patch("playlist_migrate.cli.YTMusicClient", return_value=MagicMock()),
-            patch("playlist_migrate.cli.Path.exists", return_value=True),
-            patch("playlist_migrate.cli.PlaylistMigrator", return_value=mock_migrator),
-        ):
-            main()
-
-            mock_migrator.migrate.assert_awaited_once_with(
-                source_id="ytmusic",
-                target_id="spotify",
-                playlist_identifier="PL_123",
-                target_name=None,
-                sync=False,
-            )

@@ -83,7 +83,7 @@ playlist-migrate/
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. Clonar el proyecto
-git clone <tu-repositorio>
+git clone https://github.com/PeyoCL/playlist-migrate.git
 cd playlist-migrate
 
 # 3. Instalar dependencias con Python 3.14
