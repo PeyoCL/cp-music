@@ -11,3 +11,8 @@ build/
 curl.txt
 debug_*.py
 *.swp
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
