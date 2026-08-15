@@ -46,17 +46,21 @@ cp-music/
 │   ├── models.py            # Track, Playlist, MigrationResult (dataclasses con slots)
 │   ├── exceptions.py        # AuthError, NetworkError, RateLimitError
 │   ├── utils.py             # Decorador @with_retries (Exponential Backoff)
-│   ├── spotify_client.py    # Implementación MusicProvider para Spotify
-│   ├── ytmusic_client.py    # Implementación MusicProvider para YouTube Music
-│   └── migrator.py          # Orquestador genérico: fuente → destino
+│   ├── migrator.py          # Orquestador genérico: fuente → destino
+│   └── providers/           # Clientes modulares de servicios de música
+│       ├── __init__.py      # Exporta SpotifyClient y YTMusicClient
+│       ├── spotify.py       # Implementación MusicProvider para Spotify
+│       └── ytmusic.py       # Implementación MusicProvider para YouTube Music
 ├── docs/
 │   ├── providers/
 │   │   ├── SPOTIFY.md       # Configuración y autenticación de Spotify
 │   │   └── YTMUSIC.md       # Configuración y autenticación de YouTube Music
 │   └── ADDING_NEW_PROVIDERS.md  # Guía para añadir nuevos servicios
 ├── tests/
-│   ├── conftest.py          # Fixtures pytest (mocks de proveedores)
-│   └── test_migrator.py     # Suite de tests (asyncio, parametrizados)
+│   ├── conftest.py               # Fixtures pytest (mocks de proveedores)
+│   ├── test_migrator.py          # Tests del orquestador migrador (asyncio)
+│   ├── test_spotify_provider.py  # Tests unitarios mockeados de Spotify
+│   └── test_ytmusic_provider.py  # Tests unitarios mockeados de YouTube Music
 ├── .pre-commit-config.yaml  # Hooks de calidad y seguridad
 ├── .env.example
 ├── pyproject.toml           # uv, Ruff, Bandit, pytest

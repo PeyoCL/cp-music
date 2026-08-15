@@ -1,13 +1,14 @@
 """
-ytmusic_client.py — YouTube Music client for cp-music.
+ytmusic.py — YouTube Music client for cp-music.
 
-Wraps ytmusicapi to provide:
+Wraps ytmusicapi to provide operations conforming to MusicProvider:
 
   * Authentication setup via browser-copied headers (setup_headers_auth).
   * Reading playlists from YouTube Music (get_playlist, get_existing_playlist).
   * Searching for tracks (search_track) using a 3-tier strategy.
   * Creating playlists (create_playlist).
   * Adding tracks to playlists (add_tracks).
+  * Clearing playlists (clear_playlist).
 
 Authentication:
     YouTube Music does not expose a public OAuth API for personal libraries.

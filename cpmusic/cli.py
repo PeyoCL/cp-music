@@ -40,8 +40,7 @@ from dotenv import load_dotenv
 
 from cpmusic.interfaces import MusicProvider
 from cpmusic.migrator import PlaylistMigrator
-from cpmusic.spotify_client import SpotifyClient
-from cpmusic.ytmusic_client import YTMusicClient
+from cpmusic.providers import SpotifyClient, YTMusicClient
 
 logger = logging.getLogger(__name__)
 

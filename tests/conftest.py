@@ -2,8 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from cpmusic.spotify_client import SpotifyClient
-from cpmusic.ytmusic_client import YTMusicClient
+from cpmusic.providers import SpotifyClient, YTMusicClient
 
 
 @pytest.fixture

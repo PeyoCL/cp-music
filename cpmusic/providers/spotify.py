@@ -1,14 +1,16 @@
 """
-spotify_client.py — Spotify API client for cp-music.
+spotify.py — Spotify API client for cp-music.
 
 Handles authentication (OAuth2 PKCE for private playlists, Client Credentials
-fallback for public-only access) and provides two main operations:
+fallback for public-only access) and provides operations to conform to MusicProvider:
 
-  * get_playlist()        — Fetch a Spotify playlist with all tracks.
-  * search_track()        — Search Spotify for a track by title/artist/ISRC.
-  * create_playlist()     — Create a new Spotify playlist.
-  * add_tracks()          — Add tracks to a Spotify playlist.
+  * get_playlist()          — Fetch a Spotify playlist with all tracks.
+  * search_track()          — Search Spotify for a track by title/artist/ISRC.
+  * create_playlist()       — Create a new Spotify playlist.
+  * add_tracks()            — Add tracks to a Spotify playlist.
+  * clear_playlist()        — Remove all tracks from a Spotify playlist.
   * get_existing_playlist() — Find a playlist by name in the user's library.
+  * upload_cover_image()    — Upload a custom cover image to a playlist.
 
 Environment variables (loaded from .env):
   SPOTIPY_CLIENT_ID       Spotify app client ID (required)
@@ -18,10 +20,12 @@ Environment variables (loaded from .env):
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
 import re
 
+import requests
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyPKCE
 
@@ -373,7 +377,7 @@ class SpotifyClient:
 
         Args:
             playlist_id: Target Spotify playlist ID.
-            track_ids:  List of ``spotify:track:<id>`` URIs to add.
+            track_ids:   List of ``spotify:track:<id>`` URIs to add.
             chunk_size:  Batch size (max 100 per Spotify API limit).
 
         Raises:
@@ -452,11 +456,7 @@ class SpotifyClient:
             raise RuntimeError("Spotify client is not authenticated.")
 
         try:
-            import base64
-
-            import requests as req_lib
-
-            response = req_lib.get(image_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            response = requests.get(image_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
             response.raise_for_status()
             b64_image = base64.b64encode(response.content).decode("utf-8")
             self.sp.playlist_upload_cover_image(playlist_id, b64_image)

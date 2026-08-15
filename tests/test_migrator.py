@@ -16,8 +16,7 @@ from cpmusic.models import (
     SpotifyPlaylist,
     Track,
 )
-from cpmusic.spotify_client import SpotifyClient
-from cpmusic.ytmusic_client import YTMusicClient
+from cpmusic.providers import SpotifyClient, YTMusicClient
 
 # ---------------------------------------------------------------------------
 # Helper factories

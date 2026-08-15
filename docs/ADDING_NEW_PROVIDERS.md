@@ -19,7 +19,7 @@ El flujo de integración de un nuevo proveedor tiene 4 pasos:
 El contrato que debe cumplir cualquier cliente está definido en [`cpmusic/interfaces.py`](../cpmusic/interfaces.py). Gracias a `typing.Protocol`, **no necesitas heredar** de ninguna clase base: solo debes implementar los métodos con las firmas correctas.
 
 ```python
-# cpmusic/your_service_client.py
+# cpmusic/providers/your_service.py
 from __future__ import annotations
 
 from cpmusic.models import Playlist, Track
@@ -144,7 +144,8 @@ migrate.add_argument(
 ```python
 # En main(), dentro del bloque elif args.command == "migrate":
 if "myservice" in (args.source, args.target):
-    from cpmusic.your_service_client import YourServiceClient
+    from cpmusic.providers.your_service import YourServiceClient
+
     providers["myservice"] = YourServiceClient(api_key=os.getenv("MY_SERVICE_API_KEY"))
 ```
 
