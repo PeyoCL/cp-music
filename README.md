@@ -147,10 +147,13 @@ playlist-migrate \
 # Spotify → YouTube Music (Playlist normal)
 playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" --source spotify --target ytmusic
 
-# Spotify → YouTube Music (Canciones Favoritas / "Tus me gusta")
+# Spotify → YouTube Music (Canciones Favoritas directas con 👍 a 'Música que te gusta')
 playlist-migrate --liked-songs-pl --source spotify --target ytmusic
 
-# Con alias corto (-lsp) y nombre personalizado en el destino
+# YouTube Music → Spotify (Canciones Favoritas directas con 💚 a '/collection/tracks')
+playlist-migrate -lsp -s ytmusic -t spotify
+
+# Con nombre personalizado (crea una playlist en lugar de marcarlas con Like)
 playlist-migrate -lsp -s spotify -t ytmusic --name "Mis Favoritas Spotify"
 
 # YouTube Music → Spotify (Playlist normal)

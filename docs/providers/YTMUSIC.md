@@ -113,13 +113,16 @@ El `PLAYLIST_ID` que necesita `playlist-migrate` es el **ID alfanumérico** de l
 ## ⚡ Ejemplos de Uso
 
 ```bash
-# Migrar playlist de YouTube Music hacia Spotify
+# Migrar playlist de YouTube Music hacia Spotify (Playlist normal)
 playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
 
-# Migrar desde Spotify hacia YouTube Music (Canciones Favoritas / "Tus me gusta")
+# Migrar canciones favoritas de Spotify directamente con 👍 a 'Música que te gusta' (LM)
 playlist-migrate --liked-songs-pl --source spotify --target ytmusic
 
-# Con alias corto (-lsp) y nombre personalizado
+# Migrar canciones favoritas de YouTube Music directamente con 💚 a Spotify (/collection/tracks)
+playlist-migrate -lsp --source ytmusic --target spotify
+
+# Con nombre personalizado (crea una playlist en vez de marcarlas con Like)
 playlist-migrate -lsp -s spotify -t ytmusic --name "Favoritas Spotify"
 
 # Migrar desde Spotify hacia YouTube Music (Playlist normal)

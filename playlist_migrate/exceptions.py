@@ -84,6 +84,12 @@ class LikedSongsFetchError(PlaylistError):
     pass
 
 
+class LikedSongsModifyError(PlaylistError):
+    """Raised when saving or liking tracks in the library fails."""
+
+    pass
+
+
 class PlaylistNotFoundError(PlaylistError):
     """Raised when a requested playlist cannot be found on the service."""
 

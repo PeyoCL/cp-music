@@ -85,23 +85,21 @@ class PlaylistMigrator:
         print(f"\n🎵 Searching {target_id.title()} for {len(source.tracks)} tracks...")
         track_ids, failed = await self._search_tracks(target_provider, tracks=source.tracks)
 
-        dest_playlist_id, existing_pl = self._resolve_playlist(target_provider, dest_name, source, target_id)
+        if liked_songs and target_name is None:
+            # Native Liked Songs sync / save into library
+            dest_playlist_id = "liked_songs" if target_id == "spotify" else "LM"
+            try:
+                existing_pl = target_provider.get_liked_songs()
+            except Exception as err:
+                logger.warning("Could not fetch target liked songs for duplicate detection: %s", err)
+                existing_pl = None
 
-        if sync:
-            print("\n🔄 Sync mode: Replacing target playlist contents to match exactly...")
-            valid_ids = [tid for tid in track_ids if tid]
-            target_provider.clear_playlist(dest_playlist_id)
-            if valid_ids:
-                target_provider.add_tracks(playlist_id=dest_playlist_id, track_ids=valid_ids)
-            skipped_count = 0
-            migrated_count = len(valid_ids)
-        else:
             existing_ids = set()
             existing_isrcs = set()
             existing_names = set()
 
             if existing_pl:
-                print("    Adding missing tracks only.")
+                print(f"    Checking existing {target_id.title()} Liked Songs for duplicates...")
                 for t in existing_pl.tracks:
                     native = getattr(t, "spotify_id", None) or getattr(t, "video_id", None)
                     if native:
@@ -135,23 +133,80 @@ class PlaylistMigrator:
             skipped_count = total_found - len(new_ids)
 
             if skipped_count:
-                print(f"⏩ Skipping {skipped_count} track(s) already in the playlist.")
+                print(f"⏩ Skipping {skipped_count} track(s) already liked.")
 
             if new_ids:
-                print(f"🚀 Adding {len(new_ids)} new track(s) to {target_id.title()}...")
-                target_provider.add_tracks(playlist_id=dest_playlist_id, track_ids=new_ids)
+                print(f"❤️  Liking / Saving {len(new_ids)} track(s) in {target_id.title()} library...")
+                target_provider.add_liked_songs(track_ids=new_ids)
             migrated_count = len(new_ids)
+        else:
+            dest_playlist_id, existing_pl = self._resolve_playlist(target_provider, dest_name, source, target_id)
 
-        # Upload cover image if supported by the provider
-        if source.cover_url:
-            if hasattr(target_provider, "upload_cover_image"):
-                print(f"🖼️  Uploading playlist cover image to {target_id.title()}...")
-                try:
-                    target_provider.upload_cover_image(playlist_id=dest_playlist_id, image_url=source.cover_url)
-                except Exception as err:
-                    logger.warning("Failed to upload cover: %s", err)
+            if sync:
+                print("\n🔄 Sync mode: Replacing target playlist contents to match exactly...")
+                valid_ids = [tid for tid in track_ids if tid]
+                target_provider.clear_playlist(dest_playlist_id)
+                if valid_ids:
+                    target_provider.add_tracks(playlist_id=dest_playlist_id, track_ids=valid_ids)
+                skipped_count = 0
+                migrated_count = len(valid_ids)
             else:
-                print(f"⚠️  Note: {target_id.title()} does not support custom playlist cover uploads via API.")
+                existing_ids = set()
+                existing_isrcs = set()
+                existing_names = set()
+
+                if existing_pl:
+                    print("    Adding missing tracks only.")
+                    for t in existing_pl.tracks:
+                        native = getattr(t, "spotify_id", None) or getattr(t, "video_id", None)
+                        if native:
+                            if target_id == "spotify" and not native.startswith("spotify:track:"):
+                                native = f"spotify:track:{native}"
+                            existing_ids.add(native)
+
+                        if t.isrc:
+                            existing_isrcs.add(t.isrc)
+                        existing_names.add(f"{t.artist_name} - {t.title}".lower())
+
+                new_ids = []
+                for track, tid in zip(source.tracks, track_ids, strict=False):
+                    if not tid:
+                        continue
+                    if tid in existing_ids:
+                        continue
+                    if track.isrc and track.isrc in existing_isrcs:
+                        continue
+                    name_key = f"{track.artist_name} - {track.title}".lower()
+                    if name_key in existing_names:
+                        continue
+
+                    new_ids.append(tid)
+                    existing_ids.add(tid)
+                    if track.isrc:
+                        existing_isrcs.add(track.isrc)
+                    existing_names.add(name_key)
+
+                total_found = sum(1 for u in track_ids if u)
+                skipped_count = total_found - len(new_ids)
+
+                if skipped_count:
+                    print(f"⏩ Skipping {skipped_count} track(s) already in the playlist.")
+
+                if new_ids:
+                    print(f"🚀 Adding {len(new_ids)} new track(s) to {target_id.title()}...")
+                    target_provider.add_tracks(playlist_id=dest_playlist_id, track_ids=new_ids)
+                migrated_count = len(new_ids)
+
+            # Upload cover image if supported by the provider
+            if source.cover_url:
+                if hasattr(target_provider, "upload_cover_image"):
+                    print(f"🖼️  Uploading playlist cover image to {target_id.title()}...")
+                    try:
+                        target_provider.upload_cover_image(playlist_id=dest_playlist_id, image_url=source.cover_url)
+                    except Exception as err:
+                        logger.warning("Failed to upload cover: %s", err)
+                else:
+                    print(f"⚠️  Note: {target_id.title()} does not support custom playlist cover uploads via API.")
 
         result = MigrationResult(
             playlist_name=dest_name,

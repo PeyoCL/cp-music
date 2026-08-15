@@ -106,8 +106,11 @@ playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" \
     --source spotify --target ytmusic \
     --name "Road Trip 2025"
 
-# Migrar desde YouTube Music hacia Spotify
+# Migrar desde YouTube Music hacia Spotify (Playlist normal)
 playlist-migrate "PLxxxxxxxxxxxxxxxxxxxxxx" --source ytmusic --target spotify
+
+# Migrar canciones favoritas de YouTube Music hacia 'Tus me gusta' de Spotify (/collection/tracks)
+playlist-migrate -lsp --source ytmusic --target spotify
 
 # Sincronización exacta (borra lo que sobra en la playlist destino)
 playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" --source spotify --target ytmusic --sync
@@ -127,6 +130,7 @@ playlist-migrate "37i9dQZF1DXcBWIGoYBM5M" --source spotify --target ytmusic --sy
 | `playlist-modify-private` | Crear/modificar playlists privadas |
 | `ugc-image-upload` | Subir portadas personalizadas a playlists |
 | `user-library-read` | Leer la lista de canciones favoritas ("Tus me gusta") |
+| `user-library-modify` | Guardar canciones directamente en favoritos (`/collection/tracks`) |
 
 ---
 

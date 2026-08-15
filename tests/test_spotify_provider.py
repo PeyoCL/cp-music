@@ -8,7 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from playlist_migrate.exceptions import LikedSongsFetchError, PlaylistFetchError, SpotifyAuthError
+from playlist_migrate.exceptions import (
+    LikedSongsFetchError,
+    LikedSongsModifyError,
+    PlaylistFetchError,
+    SpotifyAuthError,
+)
 from playlist_migrate.models import Track
 from playlist_migrate.providers.spotify import SpotifyClient
 
@@ -232,6 +237,33 @@ class TestSpotifyGetLikedSongs:
 
         with pytest.raises(LikedSongsFetchError, match="Failed to fetch Spotify liked songs"):
             client.get_liked_songs()
+
+
+class TestSpotifyAddLikedSongs:
+    def test_add_liked_songs_success_batched(self, spotify_client_mocked: tuple[SpotifyClient, MagicMock]) -> None:
+        client, mock_sp = spotify_client_mocked
+        track_ids = [f"spotify:track:id_{i}" for i in range(75)]
+
+        client.add_liked_songs(track_ids, chunk_size=50)
+
+        assert mock_sp.current_user_saved_tracks_add.call_count == 2
+        mock_sp.current_user_saved_tracks_add.assert_any_call(tracks=[f"id_{i}" for i in range(50)])
+        mock_sp.current_user_saved_tracks_add.assert_any_call(tracks=[f"id_{i}" for i in range(50, 75)])
+
+    def test_add_liked_songs_unauthenticated_raises_error(self) -> None:
+        client = SpotifyClient.__new__(SpotifyClient)
+        client.sp = None
+        with pytest.raises(SpotifyAuthError, match="Spotify client is not authenticated"):
+            client.add_liked_songs(["id_1"])
+
+    def test_add_liked_songs_api_failure_raises_error(
+        self, spotify_client_mocked: tuple[SpotifyClient, MagicMock]
+    ) -> None:
+        client, mock_sp = spotify_client_mocked
+        mock_sp.current_user_saved_tracks_add.side_effect = Exception("API error")
+
+        with pytest.raises(LikedSongsModifyError, match="Failed to save tracks to Spotify Liked Songs"):
+            client.add_liked_songs(["id_1"])
 
 
 class TestSpotifyGetExistingPlaylist:

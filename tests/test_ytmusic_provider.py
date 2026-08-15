@@ -8,7 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from playlist_migrate.exceptions import LikedSongsFetchError, PlaylistFetchError, YTMusicAuthError
+from playlist_migrate.exceptions import (
+    LikedSongsFetchError,
+    LikedSongsModifyError,
+    PlaylistFetchError,
+    YTMusicAuthError,
+)
 from playlist_migrate.models import Track
 from playlist_migrate.providers.ytmusic import YTMusicClient
 
@@ -175,6 +180,31 @@ class TestYTMusicGetLikedSongs:
 
         with pytest.raises(LikedSongsFetchError, match="Failed to fetch YouTube Music liked songs"):
             client.get_liked_songs()
+
+
+class TestYTMusicAddLikedSongs:
+    def test_add_liked_songs_success(self, ytmusic_client_mocked: tuple[YTMusicClient, MagicMock]) -> None:
+        client, mock_yt = ytmusic_client_mocked
+        client.add_liked_songs(["vid_1", "vid_2"])
+
+        assert mock_yt.rate_song.call_count == 2
+        mock_yt.rate_song.assert_any_call(videoId="vid_1", rating="LIKE")
+        mock_yt.rate_song.assert_any_call(videoId="vid_2", rating="LIKE")
+
+    def test_add_liked_songs_unauthenticated_raises_error(self) -> None:
+        client = YTMusicClient.__new__(YTMusicClient)
+        client.ytmusic = None
+        with pytest.raises(YTMusicAuthError, match="YTMusic client is not authenticated"):
+            client.add_liked_songs(["vid_1"])
+
+    def test_add_liked_songs_api_failure_raises_error(
+        self, ytmusic_client_mocked: tuple[YTMusicClient, MagicMock]
+    ) -> None:
+        client, mock_yt = ytmusic_client_mocked
+        mock_yt.rate_song.side_effect = Exception("Rating failed")
+
+        with pytest.raises(LikedSongsModifyError, match="Failed to rate video vid_1 as LIKE"):
+            client.add_liked_songs(["vid_1"])
 
 
 class TestYTMusicGetExistingPlaylist:

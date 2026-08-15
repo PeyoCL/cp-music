@@ -313,36 +313,120 @@ class TestLikedSongsMigration:
     """Tests for migrating user's Liked Songs library."""
 
     @pytest.mark.asyncio
-    async def test_migrate_liked_songs_spotify_to_ytmusic(self, mock_sp: MagicMock, mock_yt: MagicMock) -> None:
+    async def test_migrate_liked_songs_spotify_to_ytmusic_native(self, mock_sp: MagicMock, mock_yt: MagicMock) -> None:
         liked_pl = make_playlist(
             name="Tus Me Gusta",
             tracks=[make_track("Liked Song 1", "Artist 1"), make_track("Liked Song 2", "Artist 2")],
             source="Spotify",
         )
         mock_sp.get_liked_songs.return_value = liked_pl
+        mock_yt.get_liked_songs.return_value = make_playlist(
+            name="Música que te gusta", tracks=[], source="YouTube Music"
+        )
         mock_yt.search_track.side_effect = ["vid_1", "vid_2"]
-        mock_yt.get_existing_playlist.return_value = None
-        mock_yt.create_playlist.return_value = "PL_LIKED_YT"
 
         migrator = PlaylistMigrator(providers={"spotify": mock_sp, "ytmusic": mock_yt})
         result = await migrator.migrate(
             source_id="spotify",
             target_id="ytmusic",
             liked_songs=True,
+            target_name=None,
         )
 
         mock_sp.get_liked_songs.assert_called_once()
+        mock_yt.get_liked_songs.assert_called_once()
+        mock_yt.add_liked_songs.assert_called_once_with(track_ids=["vid_1", "vid_2"])
+        assert result.migrated_count == 2
+        assert result.target_playlist_id == "LM"
+
+    @pytest.mark.asyncio
+    async def test_migrate_liked_songs_ytmusic_to_spotify_native(self, mock_sp: MagicMock, mock_yt: MagicMock) -> None:
+        liked_pl = make_playlist(
+            name="Música que te gusta",
+            tracks=[make_track("YT Fav 1", "Artist A")],
+            source="YouTube Music",
+        )
+        mock_yt.get_liked_songs.return_value = liked_pl
+        mock_sp.get_liked_songs.return_value = make_playlist(name="Tus Me Gusta", tracks=[], source="Spotify")
+        mock_sp.search_track.return_value = "spotify:track:sp_fav_1"
+
+        migrator = PlaylistMigrator(providers={"spotify": mock_sp, "ytmusic": mock_yt})
+        result = await migrator.migrate(
+            source_id="ytmusic",
+            target_id="spotify",
+            liked_songs=True,
+            target_name=None,
+        )
+
+        mock_yt.get_liked_songs.assert_called_once()
+        mock_sp.get_liked_songs.assert_called_once()
+        mock_sp.add_liked_songs.assert_called_once_with(track_ids=["spotify:track:sp_fav_1"])
+        assert result.migrated_count == 1
+        assert result.target_playlist_id == "liked_songs"
+
+    @pytest.mark.asyncio
+    async def test_migrate_liked_songs_skips_duplicates(self, mock_sp: MagicMock, mock_yt: MagicMock) -> None:
+        source_tracks = [
+            make_track("Song 1", "Artist 1", isrc="ISRC1", video_id="vid_1"),
+            make_track("Song 2", "Artist 2", isrc="ISRC2", video_id="vid_2"),
+        ]
+        liked_pl = make_playlist(name="Tus Me Gusta", tracks=source_tracks, source="Spotify")
+        mock_sp.get_liked_songs.return_value = liked_pl
+
+        # Target already has Song 1
+        existing_target_tracks = [
+            make_track("Song 1", "Artist 1", isrc="ISRC1", video_id="vid_1"),
+        ]
+        mock_yt.get_liked_songs.return_value = make_playlist(
+            name="Música que te gusta", tracks=existing_target_tracks, source="YouTube Music"
+        )
+        mock_yt.search_track.side_effect = ["vid_1", "vid_2"]
+
+        migrator = PlaylistMigrator(providers={"spotify": mock_sp, "ytmusic": mock_yt})
+        result = await migrator.migrate(
+            source_id="spotify",
+            target_id="ytmusic",
+            liked_songs=True,
+            target_name=None,
+        )
+
+        assert result.migrated_count == 1
+        assert result.skipped_count == 1
+        mock_yt.add_liked_songs.assert_called_once_with(track_ids=["vid_2"])
+
+    @pytest.mark.asyncio
+    async def test_migrate_liked_songs_with_custom_name_creates_playlist(
+        self, mock_sp: MagicMock, mock_yt: MagicMock
+    ) -> None:
+        liked_pl = make_playlist(
+            name="Tus Me Gusta",
+            tracks=[make_track("Liked Song 1", "Artist 1")],
+            source="Spotify",
+        )
+        mock_sp.get_liked_songs.return_value = liked_pl
+        mock_yt.search_track.return_value = "vid_1"
+        mock_yt.get_existing_playlist.return_value = None
+        mock_yt.create_playlist.return_value = "PL_CUSTOM"
+
+        migrator = PlaylistMigrator(providers={"spotify": mock_sp, "ytmusic": mock_yt})
+        result = await migrator.migrate(
+            source_id="spotify",
+            target_id="ytmusic",
+            liked_songs=True,
+            target_name="Mis Favoritas",
+        )
+
         mock_yt.create_playlist.assert_called_once_with(
-            title="Tus Me Gusta",
+            title="Mis Favoritas",
             description="Migrated from Spotify playlist: Tus Me Gusta. Test playlist",
         )
         mock_yt.add_tracks.assert_called_once_with(
-            playlist_id="PL_LIKED_YT",
-            track_ids=["vid_1", "vid_2"],
+            playlist_id="PL_CUSTOM",
+            track_ids=["vid_1"],
         )
-        assert result.migrated_count == 2
-        assert result.playlist_name == "Tus Me Gusta"
-        assert result.target_playlist_id == "PL_LIKED_YT"
+        assert result.migrated_count == 1
+        assert result.playlist_name == "Mis Favoritas"
+        assert result.target_playlist_id == "PL_CUSTOM"
 
     @pytest.mark.asyncio
     async def test_migrate_missing_playlist_id_and_not_liked_songs_raises_error(

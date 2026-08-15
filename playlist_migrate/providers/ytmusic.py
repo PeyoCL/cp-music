@@ -36,6 +36,7 @@ from ytmusicapi import YTMusic
 
 from playlist_migrate.exceptions import (
     LikedSongsFetchError,
+    LikedSongsModifyError,
     PlaylistFetchError,
     PlaylistModificationError,
     YTMusicAuthError,
@@ -534,3 +535,27 @@ class YTMusicClient:
                 logger.info("YTMusic playlist %s is already empty.", playlist_id)
         except Exception as err:
             raise PlaylistModificationError(f"Failed to clear YTMusic playlist {playlist_id}: {err}") from err
+
+    def add_liked_songs(self, track_ids: list[str]) -> None:
+        """Add / rate songs as 'LIKE' (thumbs up) in the authenticated user's YouTube Music library.
+
+        These tracks will directly appear in the system 'LM' (Música que te gusta) playlist.
+
+        Args:
+            track_ids: List of YouTube video IDs to rate as LIKE.
+
+        Raises:
+            YTMusicAuthError: If client is not authenticated.
+            LikedSongsModifyError: If rating any track fails.
+        """
+        if not self.ytmusic:
+            raise YTMusicAuthError("YTMusic client is not authenticated.")
+
+        for video_id in track_ids:
+            if not video_id:
+                continue
+            try:
+                self.ytmusic.rate_song(videoId=video_id, rating="LIKE")
+                logger.info("Rated video %s as LIKE in YouTube Music.", video_id)
+            except Exception as err:
+                raise LikedSongsModifyError(f"Failed to rate video {video_id} as LIKE: {err}") from err

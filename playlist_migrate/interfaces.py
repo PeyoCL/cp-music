@@ -87,3 +87,11 @@ class MusicProvider(Protocol):
             A `Playlist` model populated with all liked tracks.
         """
         ...
+
+    def add_liked_songs(self, track_ids: list[str]) -> None:
+        """Add / mark tracks as liked in the authenticated user's native library.
+
+        Args:
+            track_ids: List of native service track IDs/URIs to like/save.
+        """
+        ...

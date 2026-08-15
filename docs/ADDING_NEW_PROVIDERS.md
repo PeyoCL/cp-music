@@ -84,6 +84,10 @@ class YourServiceClient:
     def get_liked_songs(self) -> Playlist:
         """Obtiene la biblioteca de canciones favoritas / 'me gusta' del usuario autenticado."""
         ...
+
+    def add_liked_songs(self, track_ids: list[str]) -> None:
+        """Marca o guarda canciones en la biblioteca de favoritos del usuario autenticado."""
+        ...
 ```
 
 Exporta el nuevo cliente en [`playlist_migrate/providers/__init__.py`](../playlist_migrate/providers/__init__.py).

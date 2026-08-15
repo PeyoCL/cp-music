@@ -31,6 +31,7 @@ from spotipy.oauth2 import SpotifyClientCredentials, SpotifyPKCE
 
 from playlist_migrate.exceptions import (
     LikedSongsFetchError,
+    LikedSongsModifyError,
     PlaylistCreationError,
     PlaylistFetchError,
     PlaylistModificationError,
@@ -61,7 +62,8 @@ class SpotifyClient:
         "playlist-modify-public "
         "playlist-modify-private "
         "ugc-image-upload "
-        "user-library-read"
+        "user-library-read "
+        "user-library-modify"
     )
 
     def __init__(
@@ -535,3 +537,28 @@ class SpotifyClient:
             logger.info("Successfully updated cover image for Spotify playlist %s", playlist_id)
         except Exception as err:
             logger.warning("Failed to upload cover image to Spotify: %s", err)
+
+    def add_liked_songs(self, track_ids: list[str], chunk_size: int = 50) -> None:
+        """Save / like tracks in the authenticated user's Spotify library (/collection/tracks).
+
+        Spotify API limit is 50 tracks per batch.
+
+        Args:
+            track_ids:  List of Spotify track URIs or IDs to save.
+            chunk_size: Batch size (max 50).
+
+        Raises:
+            SpotifyAuthError: If client is not authenticated.
+            LikedSongsModifyError: If saving tracks fails.
+        """
+        if not self.sp:
+            raise SpotifyAuthError("Spotify client is not authenticated.")
+
+        clean_ids = [tid.removeprefix("spotify:track:") for tid in track_ids if tid]
+        for i in range(0, len(clean_ids), chunk_size):
+            chunk = clean_ids[i : i + chunk_size]
+            try:
+                self.sp.current_user_saved_tracks_add(tracks=chunk)
+                logger.info("Saved batch of %d tracks to Spotify Liked Songs library.", len(chunk))
+            except Exception as err:
+                raise LikedSongsModifyError(f"Failed to save tracks to Spotify Liked Songs: {err}") from err
