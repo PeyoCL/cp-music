@@ -1,10 +1,22 @@
-# playlist-migrate 🎵↔️
+<div align="center">
 
-Herramienta extensible en Python para **migrar listas de reproducción** entre servicios de música de forma directa, bidireccional y agnóstica.
+<img src="./assets/logo.png" alt="playlist-migrate logo" width="700"/>
+
+<br/>
+
+### 🎵 Migración directa, extensible y bidireccional de playlists entre plataformas de música.
+
+[![CI](https://github.com/PeyoCL/playlist-migrate/actions/workflows/ci.yml/badge.svg)](https://github.com/PeyoCL/playlist-migrate/actions/workflows/ci.yml)
+[![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Security: Bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ```bash
 playlist-migrate "PLAYLIST_ID" --source spotify --target ytmusic
 ```
+
+</div>
 
 ---
 
@@ -25,10 +37,10 @@ playlist-migrate "PLAYLIST_ID" --source spotify --target ytmusic
 
 ## 📦 Servicios Disponibles
 
-| Servicio | ID CLI | Estado | Documentación |
-|---|---|---|---|
-| Spotify | `spotify` | ✅ Disponible | [docs/providers/SPOTIFY.md](./docs/providers/SPOTIFY.md) |
-| YouTube Music | `ytmusic` | ✅ Disponible | [docs/providers/YTMUSIC.md](./docs/providers/YTMUSIC.md) |
+| Icono | Servicio | ID CLI | Estado | Documentación |
+|:---:|---|---|---|---|
+| 🟢 | **Spotify** | `spotify` | ✅ Disponible | [docs/providers/SPOTIFY.md](./docs/providers/SPOTIFY.md) |
+| 🔴 | **YouTube Music** | `ytmusic` | ✅ Disponible | [docs/providers/YTMUSIC.md](./docs/providers/YTMUSIC.md) |
 
 > ¿Quieres añadir un nuevo servicio? Consulta la guía para desarrolladores en [`docs/ADDING_NEW_PROVIDERS.md`](./docs/ADDING_NEW_PROVIDERS.md).
 
@@ -38,13 +50,16 @@ playlist-migrate "PLAYLIST_ID" --source spotify --target ytmusic
 
 ```
 playlist-migrate/
+├── assets/
+│   ├── icon.png             # Icono de la aplicación
+│   └── logo.png             # Logotipo y banner principal
 ├── playlist_migrate/
 │   ├── __init__.py
 │   ├── __main__.py          # Entrada: python -m playlist_migrate
 │   ├── cli.py               # CLI directa y comando 'setup-auth'
 │   ├── interfaces.py        # Protocolo MusicProvider (contrato para todos los servicios)
 │   ├── models.py            # Track, Playlist, MigrationResult (dataclasses con slots)
-│   ├── exceptions.py        # AuthError, NetworkError, RateLimitError
+│   ├── exceptions.py        # CPMusicError, AuthError, NetworkError, RateLimitError
 │   ├── utils.py             # Decorador @with_retries (Exponential Backoff)
 │   ├── migrator.py          # Orquestador genérico: fuente → destino
 │   └── providers/           # Clientes modulares de servicios de música
@@ -58,6 +73,7 @@ playlist-migrate/
 │   └── ADDING_NEW_PROVIDERS.md  # Guía para añadir nuevos servicios
 ├── tests/
 │   ├── conftest.py               # Fixtures pytest (mocks de proveedores)
+│   ├── test_cli.py               # Tests del CLI y sintaxis directa
 │   ├── test_migrator.py          # Tests del orquestador migrador (asyncio)
 │   ├── test_spotify_provider.py  # Tests unitarios mockeados de Spotify
 │   └── test_ytmusic_provider.py  # Tests unitarios mockeados de YouTube Music
@@ -103,7 +119,7 @@ Cada servicio de música requiere su propia autenticación. Consulta la document
 
 ## ⚡ Uso
 
-Puedes ejecutar la herramienta directamente con `uv run playlist-migrate` (o `uv run python -m playlist_migrate`):
+Puedes ejecutar la herramienta directamente con `playlist-migrate` (o `uv run python -m playlist_migrate`):
 
 ### Sintaxis Directa
 
