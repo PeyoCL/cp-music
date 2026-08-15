@@ -10,12 +10,12 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from cpmusic.interfaces import MusicProvider
 from cpmusic.models import (
     MigrationResult,
     Playlist,
     Track,
 )
-from cpmusic.interfaces import MusicProvider
 from cpmusic.utils import with_retries
 
 logger = logging.getLogger(__name__)
@@ -57,10 +57,10 @@ class PlaylistMigrator:
                   Otherwise, just add missing tracks (idempotent).
         """
         logger.info("Starting %s → %s migration: %s", source_id, target_id, playlist_identifier)
-        
+
         source_provider = self.providers.get(source_id)
         target_provider = self.providers.get(target_id)
-        
+
         if not source_provider:
             raise ValueError(f"Source provider '{source_id}' not found.")
         if not target_provider:
@@ -68,7 +68,7 @@ class PlaylistMigrator:
 
         source: Playlist = source_provider.get_playlist(playlist_identifier)
         dest_name = target_name or source.name
-        
+
         direction_label = f"{source_id.title()} → {target_id.title()}"
 
         if not source.tracks:
@@ -101,7 +101,7 @@ class PlaylistMigrator:
                         if target_id == "spotify" and not native.startswith("spotify:track:"):
                             native = f"spotify:track:{native}"
                         existing_ids.add(native)
-                        
+
                     if t.isrc:
                         existing_isrcs.add(t.isrc)
                     existing_names.add(f"{t.artist_name} - {t.title}".lower())
@@ -144,9 +144,7 @@ class PlaylistMigrator:
                 except Exception as err:
                     logger.warning("Failed to upload cover: %s", err)
             else:
-                print(
-                    f"⚠️  Note: {target_id.title()} does not support custom playlist cover uploads via API."
-                )
+                print(f"⚠️  Note: {target_id.title()} does not support custom playlist cover uploads via API.")
 
         result = MigrationResult(
             playlist_name=dest_name,
@@ -168,7 +166,9 @@ class PlaylistMigrator:
     async def _search_single(self, target_provider: MusicProvider, track: Track) -> str | None:
         return await asyncio.to_thread(target_provider.search_track, track)
 
-    async def _search_tracks(self, target_provider: MusicProvider, tracks: list[Track]) -> tuple[list[str], list[Track]]:
+    async def _search_tracks(
+        self, target_provider: MusicProvider, tracks: list[Track]
+    ) -> tuple[list[str], list[Track]]:
         total = len(tracks)
         tasks = [self._search_single(target_provider, track) for track in tracks]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -190,7 +190,9 @@ class PlaylistMigrator:
                 failed.append(track)
         return track_ids, failed
 
-    def _resolve_playlist(self, target_provider: MusicProvider, name: str, source: Playlist, target_id: str) -> tuple[str, Playlist | None]:
+    def _resolve_playlist(
+        self, target_provider: MusicProvider, name: str, source: Playlist, target_id: str
+    ) -> tuple[str, Playlist | None]:
         existing = target_provider.get_existing_playlist(name)
         if existing:
             print(f"\n📋 Playlist '{name}' already exists on {target_id.title()} (ID: {existing.id}).")

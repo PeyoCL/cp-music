@@ -56,4 +56,3 @@ repos:
     hooks:
       - id: pip-audit
         name: pip-audit — check dependency CVEs
-        args: ["--require-hashes=false"]

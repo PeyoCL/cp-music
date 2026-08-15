@@ -396,13 +396,13 @@ class SpotifyClient:
 
     def clear_playlist(self, playlist_id: str) -> None:
         """Remove all tracks from a Spotify playlist by replacing it with an empty list.
-        
+
         Args:
             playlist_id: Target Spotify playlist ID.
         """
         if not self.sp:
             raise RuntimeError("Spotify client is not authenticated.")
-            
+
         try:
             self.sp.playlist_replace_items(playlist_id, [])
             logger.info("Cleared Spotify playlist %s.", playlist_id)

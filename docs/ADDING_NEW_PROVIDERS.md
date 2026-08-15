@@ -1,75 +1,239 @@
-# Adding a New Music Provider to cp-music
+# Añadir un Nuevo Proveedor de Música
 
-This project is designed to be easily extensible. If you want to add support for a new music streaming service (e.g., Apple Music, Tidal, Amazon Music), you only need to follow a few structural guidelines.
+`cp-music` fue diseñado desde el principio para ser extensible. Gracias al protocolo `MusicProvider`, puedes añadir soporte para cualquier servicio de streaming (Apple Music, Tidal, Amazon Music, Deezer, etc.) implementando una sola clase, sin modificar el core del migrador.
 
-## 1. Implement the `MusicProvider` Protocol
+---
 
-To ensure seamless integration, any new client must conform to the `MusicProvider` structural type (Protocol) defined in `cpmusic/interfaces.py`. Because Python 3.12+ supports `typing.Protocol`, you don't even need to subclass it directly, you just need to implement its methods with the exact same signatures.
+## Visión General
 
-### Required Methods
+El flujo de integración de un nuevo proveedor tiene 4 pasos:
 
-Your client class (e.g., `AppleMusicClient`) must expose the following asynchronous or synchronous methods:
+```
+1. Implementar MusicProvider  →  2. Registrar en CLI  →  3. Añadir Tests  →  4. Documentar
+```
+
+---
+
+## 1. Implementar el Protocolo `MusicProvider`
+
+El contrato que debe cumplir cualquier cliente está definido en [`cpmusic/interfaces.py`](../cpmusic/interfaces.py). Gracias a `typing.Protocol`, **no necesitas heredar** de ninguna clase base: solo debes implementar los métodos con las firmas correctas.
 
 ```python
+# cpmusic/your_service_client.py
+from __future__ import annotations
+
 from cpmusic.models import Playlist, Track
-from typing import Optional
+from cpmusic.utils import with_retries
 
-class AppleMusicClient:
+
+class YourServiceClient:
+    """Client for YourService implementing the MusicProvider protocol."""
+
+    def __init__(self, api_key: str) -> None:
+        # Inicializa tu cliente con las credenciales necesarias
+        self._api_key = api_key
+
     def get_playlist(self, identifier: str) -> Playlist:
-        """Fetch a full playlist from your service including all tracks."""
-        pass
+        """Obtiene una playlist completa (con todos sus tracks) del servicio.
 
-    def get_existing_playlist(self, name: str) -> Optional[Playlist]:
-        """Find a playlist by its exact name in the user's library."""
-        pass
+        Args:
+            identifier: ID nativo de la playlist en el servicio.
 
-    def search_track(self, track: Track) -> Optional[str]:
-        """Look up a track using the provided Track model. 
-        You should return the native track ID string, or None if not found.
-        Tip: Always prioritize searching by `track.isrc` if your API supports it!
+        Returns:
+            Playlist con todos sus tracks como objetos Track.
         """
-        pass
+        ...
+
+    def get_existing_playlist(self, name: str) -> Playlist | None:
+        """Busca una playlist por nombre exacto en la biblioteca del usuario.
+
+        Returns:
+            La Playlist si se encuentra, None en caso contrario.
+        """
+        ...
+
+    def search_track(self, track: Track) -> str | None:
+        """Busca un track en el servicio y devuelve su ID nativo.
+
+        Prioriza la búsqueda por ISRC si el servicio lo soporta,
+        ya que ofrece un matching exacto y sin ambigüedades.
+
+        Returns:
+            El ID nativo del track en el servicio, o None si no se encontró.
+        """
+        ...
 
     def create_playlist(self, title: str, description: str = "") -> str:
-        """Create a new playlist and return its native ID."""
-        pass
+        """Crea una nueva playlist vacía y devuelve su ID nativo."""
+        ...
 
-    def add_tracks(self, playlist_id: str, track_ids: list[str], chunk_size: int = 50) -> None:
-        """Add tracks to the playlist using chunks to respect API rate limits."""
-        pass
+    def add_tracks(self, playlist_id: str, track_ids: list[str]) -> None:
+        """Añade tracks a una playlist existente.
+
+        Implementa paginación interna si el servicio limita la cantidad
+        de tracks por petición.
+        """
+        ...
 
     def clear_playlist(self, playlist_id: str) -> None:
-        """Remove all items from an existing playlist for strict --sync operations."""
-        pass
+        """Elimina todos los tracks de una playlist (usado en modo --sync)."""
+        ...
 ```
 
-## 2. Using the Shared Models
+### Modelos Compartidos
 
-Always use the standardized data classes defined in `cpmusic/models.py`:
-- **`Track`**: Holds universal properties like `title`, `artists`, `album`, `isrc` and `duration_ms`. 
-- **`Playlist`**: An agnostic container for tracks.
+Usa siempre los modelos de [`cpmusic/models.py`](../cpmusic/models.py):
 
-This ensures the `PlaylistMigrator` doesn't need to know where the data came from.
+| Modelo | Campos clave |
+|---|---|
+| `Track` | `title`, `artists`, `album`, `duration_ms`, `isrc`, `video_id`, `spotify_id` |
+| `Playlist` | `id`, `name`, `description`, `source`, `tracks`, `cover_url` |
 
-## 3. Integrating with `PlaylistMigrator`
+El campo `source` de `Playlist` debe ser el nombre legible del servicio (ej: `"Apple Music"`).
 
-Currently, `cpmusic/migrator.py` orchestrates the logic between source and destination providers. 
-To wire up your new provider, simply instantiate it and pass it to the migrator or add a generic flow:
+### Manejo de Errores
+
+Usa las excepciones de [`cpmusic/exceptions.py`](../cpmusic/exceptions.py) para que el migrador pueda hacer retry automático:
 
 ```python
-# In cli.py or your entrypoint
-apple_client = AppleMusicClient(...)
-migrator = PlaylistMigrator(source_client=apple_client, target_client=spotify_client)
+from cpmusic.exceptions import NetworkError, RateLimitError
+
+# En tus métodos:
+if response.status_code == 429:
+    raise RateLimitError("Apple Music rate limit reached")
+if response.status_code >= 500:
+    raise NetworkError(f"Apple Music server error: {response.status_code}")
 ```
 
-*(Note: If modifying the core migrator, ensure you adapt its internal method names to support a dynamic `source` and `target` provider pattern instead of hardcoding `spotify` and `ytmusic` variables).*
+Decora los métodos que hacen llamadas externas con `@with_retries`:
 
-## 4. Error Handling & Rate Limiting
+```python
+from cpmusic.utils import with_retries
 
-- Wrap all your external API calls with the `@with_retries` decorator located in `cpmusic.utils`.
-- Raise `RateLimitError` or `NetworkError` from `cpmusic.exceptions` when appropriate so the migrator can back off and retry automatically.
+@with_retries(max_retries=3, base_delay=1.0)
+def search_track(self, track: Track) -> str | None:
+    ...
+```
 
-## 5. Adding Tests
+---
 
-- Add a fixture for your new mocked client in `tests/conftest.py` (e.g., `mock_apple`).
-- Ensure you verify both directions (e.g., `Apple Music → Spotify` and `Spotify → Apple Music`) in `tests/test_migrator.py`.
+## 2. Registrar el Proveedor en la CLI
+
+Edita [`cpmusic/cli.py`](../cpmusic/cli.py) en la función `main()` para reconocer el nuevo proveedor:
+
+### 2a. Añadir al argumento `choices`
+
+```python
+# En _build_parser(), busca los argumentos --source y --target
+migrate.add_argument(
+    "--source",
+    required=True,
+    choices=["spotify", "ytmusic", "applemusic"],  # ← añade aquí
+    ...
+)
+migrate.add_argument(
+    "--target",
+    required=True,
+    choices=["spotify", "ytmusic", "applemusic"],  # ← y aquí
+    ...
+)
+```
+
+### 2b. Instanciar el cliente
+
+```python
+# En main(), dentro del bloque elif args.command == "migrate":
+if "applemusic" in (args.source, args.target):
+    from cpmusic.your_service_client import YourServiceClient
+    providers["applemusic"] = YourServiceClient(api_key=os.getenv("APPLE_MUSIC_API_KEY"))
+```
+
+Con esto, el comando ya es funcional:
+
+```bash
+uv run python -m cpmusic migrate "PLAYLIST_ID" --source applemusic --target spotify
+```
+
+---
+
+## 3. Añadir Tests
+
+### 3a. Fixture en `tests/conftest.py`
+
+```python
+@pytest.fixture
+def mock_apple() -> MagicMock:
+    """Mocked AppleMusicClient fixture."""
+    mock = MagicMock()
+    mock.get_existing_playlist.return_value = None
+    mock.create_playlist.return_value = "am_playlist_001"
+    return mock
+```
+
+### 3b. Tests en `tests/test_migrator.py`
+
+```python
+class TestMigratorAppleMusicToSpotify:
+    def _make_migrator(self, mock_apple, mock_sp):
+        return PlaylistMigrator(providers={"applemusic": mock_apple, "spotify": mock_sp})
+
+    @pytest.mark.asyncio
+    async def test_new_playlist_created(self, mock_apple, mock_sp):
+        tracks = [make_track("Song A"), make_track("Song B")]
+        source_pl = make_playlist(name="My Apple PL", tracks=tracks, source="Apple Music")
+
+        mock_apple.get_playlist.return_value = source_pl
+        mock_sp.search_track.side_effect = ["spotify:track:aaa", "spotify:track:bbb"]
+        mock_sp.get_existing_playlist.return_value = None
+        mock_sp.create_playlist.return_value = "sp_new"
+
+        migrator = self._make_migrator(mock_apple, mock_sp)
+        result = await migrator.migrate(
+            source_id="applemusic", target_id="spotify", playlist_identifier="am_pl_001"
+        )
+
+        assert result.migrated_count == 2
+        assert result.target_playlist_id == "sp_new"
+```
+
+Asegúrate de cubrir:
+- ✅ Nueva playlist creada desde cero
+- ✅ Playlist existente con detección de duplicados
+- ✅ Playlist vacía en el origen
+- ✅ Tracks no encontrados en el destino
+- ✅ Manejo de `RateLimitError` y `NetworkError`
+
+---
+
+## 4. Documentar el Proveedor
+
+Crea un archivo `docs/providers/NOMBRE_SERVICIO.md` siguiendo la misma estructura que los proveedores existentes:
+
+- [`docs/providers/SPOTIFY.md`](./providers/SPOTIFY.md) — ejemplo de referencia
+- [`docs/providers/YTMUSIC.md`](./providers/YTMUSIC.md) — ejemplo de referencia
+
+El documento debe cubrir:
+1. Requisitos previos y tipo de cuenta necesaria
+2. Pasos de autenticación (con capturas o instrucciones claras)
+3. Cómo obtener el ID de una playlist
+4. Ejemplos de uso con el comando `migrate`
+5. Limitaciones conocidas de la API del servicio
+6. Solución de problemas comunes
+
+Finalmente, añade el nuevo proveedor a la tabla de la sección **"Servicios Disponibles"** en el [`README.md`](../README.md).
+
+---
+
+## Checklist de Integración
+
+```
+[ ] Clase que implementa todos los métodos de MusicProvider
+[ ] Excepciones del proyecto (NetworkError, RateLimitError) en llamadas externas
+[ ] Decorator @with_retries en métodos con llamadas a APIs externas
+[ ] choices en --source y --target actualizados en cli.py
+[ ] Instanciación del cliente en main() de cli.py
+[ ] Fixture mock_<servicio> añadida en tests/conftest.py
+[ ] Tests de migración en ambas direcciones en test_migrator.py
+[ ] Documentación en docs/providers/<SERVICIO>.md
+[ ] Tabla de "Servicios Disponibles" en README.md actualizada
+```

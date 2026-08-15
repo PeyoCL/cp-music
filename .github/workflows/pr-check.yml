@@ -1,0 +1,94 @@
+# .github/workflows/pr-check.yml
+#
+# PR quality gate — runs only on pull requests.
+# Enforces standards before merging to main:
+#   - PR title follows Conventional Commits format
+#   - All CI checks are required to pass (enforced via branch protection)
+
+name: PR Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Validate PR title (Conventional Commits)
+  # ---------------------------------------------------------------------------
+  pr-title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title format (Conventional Commits)
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Allowed types (Conventional Commits spec)
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          # Optionally enforce scope — set to false to allow scope-less titles
+          requireScope: false
+          # Min length for the subject after the type
+          subjectPattern: ^.{10,}$
+          subjectPatternError: |
+            The PR title must be at least 10 characters after the type prefix.
+            Examples:
+              feat: add Apple Music provider
+              fix: handle rate limit on YTMusic search
+              docs: update Spotify setup guide
+
+  # ---------------------------------------------------------------------------
+  # Summary comment on PR with CI status
+  # ---------------------------------------------------------------------------
+  pr-summary:
+    name: Post PR summary
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment checklist on new PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🤖 PR Checklist
+
+            Thanks for your contribution! Before merging, please verify the following:
+
+            ### Code Quality
+            - [ ] All CI checks pass (lint, security, tests)
+            - [ ] New functionality includes tests
+            - [ ] Coverage remains ≥ 80%
+
+            ### If adding a new Music Provider
+            - [ ] Implements all \`MusicProvider\` protocol methods
+            - [ ] Uses \`@with_retries\` on external API calls
+            - [ ] Raises \`NetworkError\` / \`RateLimitError\` appropriately
+            - [ ] Provider registered in \`cli.py\` (choices + instantiation)
+            - [ ] Fixture added in \`tests/conftest.py\`
+            - [ ] Tests cover both migration directions
+            - [ ] \`docs/providers/<SERVICE>.md\` created
+            - [ ] \`README.md\` services table updated
+
+            ### Documentation
+            - [ ] CHANGELOG or commit messages clearly describe the change
+
+            ---
+            The CI pipeline will automatically run lint, security audit, and tests. 🚀`
+            })

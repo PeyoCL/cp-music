@@ -1,0 +1,116 @@
+# .github/workflows/ci.yml
+#
+# CI pipeline — runs on every PR and push to main.
+#
+# Jobs:
+#   lint    — Ruff linter + formatter check
+#   audit   — Bandit SAST + pip-audit CVE scan
+#   test    — pytest suite across multiple Python versions
+#   quality — Coverage enforcement (>= 80%)
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Lint & Format
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint & Format (Ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Ruff — check linting
+        run: uv run ruff check .
+
+      - name: Ruff — check formatting
+        run: uv run ruff format --check .
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Security Audit
+  # ---------------------------------------------------------------------------
+  audit:
+    name: Security Audit (Bandit + pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Bandit — static security analysis
+        run: uv run bandit -c pyproject.toml -r cpmusic/ --severity-level medium --confidence-level medium
+
+      - name: pip-audit — dependency CVE scan
+        run: uv run pip-audit
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Tests (matrix across supported Python versions)
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run pytest with coverage
+        run: |
+          uv run pytest tests/ \
+            --cov=cpmusic \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=80 \
+            -v
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7

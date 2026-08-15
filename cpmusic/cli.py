@@ -38,10 +38,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from cpmusic.migrator import PlaylistMigrator
 from cpmusic.interfaces import MusicProvider
+from cpmusic.migrator import PlaylistMigrator
 from cpmusic.spotify_client import SpotifyClient
 from cpmusic.ytmusic_client import YTMusicClient
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Argument parser construction
@@ -184,17 +186,17 @@ def main() -> None:
     # ---- migrate ----------------------------------------------------------
     elif args.command == "migrate":
         _configure_logging(verbose=args.verbose)
-        
+
         if args.source == args.target:
             print("❌ Error: --source and --target cannot be the same platform.")
             sys.exit(1)
 
         providers: dict[str, MusicProvider] = {}
-        
+
         # Initialize only required clients
         if "spotify" in (args.source, args.target):
             providers["spotify"] = SpotifyClient()
-            
+
         if "ytmusic" in (args.source, args.target):
             auth_file = Path(args.auth_file)
             if not auth_file.exists():
@@ -207,7 +209,7 @@ def main() -> None:
             providers["ytmusic"] = YTMusicClient(auth_filepath=args.auth_file)
 
         migrator = PlaylistMigrator(providers)
-        
+
         try:
             asyncio.run(
                 migrator.migrate(

@@ -229,9 +229,7 @@ class TestMigratorGeneric:
 
         assert result.migrated_count == 1
         assert result.skipped_count == 1
-        mock_yt.add_tracks.assert_called_once_with(
-            playlist_id="PL_EXISTING", track_ids=["vid002"]
-        )
+        mock_yt.add_tracks.assert_called_once_with(playlist_id="PL_EXISTING", track_ids=["vid002"])
 
     @pytest.mark.asyncio
     async def test_empty_source_playlist_returns_zero_result(self, mock_sp: MagicMock, mock_yt: MagicMock) -> None:
