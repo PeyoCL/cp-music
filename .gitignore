@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+headers_auth.json
+oauth.json
+.cache
+*.egg-info/
+dist/
+build/
+curl.txt
+debug_*.py
+*.swp
