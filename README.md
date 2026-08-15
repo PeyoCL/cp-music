@@ -29,8 +29,6 @@ uv run python -m cpmusic migrate "PLAYLIST_ID" --source spotify --target ytmusic
 |---|---|---|---|
 | Spotify | `spotify` | ✅ Disponible | [docs/providers/SPOTIFY.md](./docs/providers/SPOTIFY.md) |
 | YouTube Music | `ytmusic` | ✅ Disponible | [docs/providers/YTMUSIC.md](./docs/providers/YTMUSIC.md) |
-| Apple Music | `applemusic` | 🔜 Planificado | — |
-| Amazon Music | `amazon` | 🔜 Planificado | — |
 
 > ¿Quieres añadir un nuevo servicio? Consulta la guía para desarrolladores en [`docs/ADDING_NEW_PROVIDERS.md`](./docs/ADDING_NEW_PROVIDERS.md).
 

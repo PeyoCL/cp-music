@@ -1,6 +1,6 @@
 # Añadir un Nuevo Proveedor de Música
 
-`cp-music` fue diseñado desde el principio para ser extensible. Gracias al protocolo `MusicProvider`, puedes añadir soporte para cualquier servicio de streaming (Apple Music, Tidal, Amazon Music, Deezer, etc.) implementando una sola clase, sin modificar el core del migrador.
+`cp-music` fue diseñado desde el principio para ser extensible. Gracias al protocolo `MusicProvider`, puedes añadir soporte para cualquier servicio de streaming implementando una sola clase, sin modificar el core del migrador.
 
 ---
 
@@ -89,7 +89,7 @@ Usa siempre los modelos de [`cpmusic/models.py`](../cpmusic/models.py):
 | `Track` | `title`, `artists`, `album`, `duration_ms`, `isrc`, `video_id`, `spotify_id` |
 | `Playlist` | `id`, `name`, `description`, `source`, `tracks`, `cover_url` |
 
-El campo `source` de `Playlist` debe ser el nombre legible del servicio (ej: `"Apple Music"`).
+El campo `source` de `Playlist` debe ser el nombre legible del servicio (ej: `"My Service"`).
 
 ### Manejo de Errores
 
@@ -100,9 +100,9 @@ from cpmusic.exceptions import NetworkError, RateLimitError
 
 # En tus métodos:
 if response.status_code == 429:
-    raise RateLimitError("Apple Music rate limit reached")
+    raise RateLimitError("MyService rate limit reached")
 if response.status_code >= 500:
-    raise NetworkError(f"Apple Music server error: {response.status_code}")
+    raise NetworkError(f"MyService server error: {response.status_code}")
 ```
 
 Decora los métodos que hacen llamadas externas con `@with_retries`:
@@ -128,13 +128,13 @@ Edita [`cpmusic/cli.py`](../cpmusic/cli.py) en la función `main()` para reconoc
 migrate.add_argument(
     "--source",
     required=True,
-    choices=["spotify", "ytmusic", "applemusic"],  # ← añade aquí
+    choices=["spotify", "ytmusic", "myservice"],  # ← añade aquí
     ...
 )
 migrate.add_argument(
     "--target",
     required=True,
-    choices=["spotify", "ytmusic", "applemusic"],  # ← y aquí
+    choices=["spotify", "ytmusic", "myservice"],  # ← y aquí
     ...
 )
 ```
@@ -143,15 +143,15 @@ migrate.add_argument(
 
 ```python
 # En main(), dentro del bloque elif args.command == "migrate":
-if "applemusic" in (args.source, args.target):
+if "myservice" in (args.source, args.target):
     from cpmusic.your_service_client import YourServiceClient
-    providers["applemusic"] = YourServiceClient(api_key=os.getenv("APPLE_MUSIC_API_KEY"))
+    providers["myservice"] = YourServiceClient(api_key=os.getenv("MY_SERVICE_API_KEY"))
 ```
 
 Con esto, el comando ya es funcional:
 
 ```bash
-uv run python -m cpmusic migrate "PLAYLIST_ID" --source applemusic --target spotify
+uv run python -m cpmusic migrate "PLAYLIST_ID" --source myservice --target spotify
 ```
 
 ---
@@ -162,34 +162,34 @@ uv run python -m cpmusic migrate "PLAYLIST_ID" --source applemusic --target spot
 
 ```python
 @pytest.fixture
-def mock_apple() -> MagicMock:
-    """Mocked AppleMusicClient fixture."""
+def mock_myservice() -> MagicMock:
+    """Mocked YourServiceClient fixture."""
     mock = MagicMock()
     mock.get_existing_playlist.return_value = None
-    mock.create_playlist.return_value = "am_playlist_001"
+    mock.create_playlist.return_value = "ms_playlist_001"
     return mock
 ```
 
 ### 3b. Tests en `tests/test_migrator.py`
 
 ```python
-class TestMigratorAppleMusicToSpotify:
-    def _make_migrator(self, mock_apple, mock_sp):
-        return PlaylistMigrator(providers={"applemusic": mock_apple, "spotify": mock_sp})
+class TestMigratorMyServiceToSpotify:
+    def _make_migrator(self, mock_ms, mock_sp):
+        return PlaylistMigrator(providers={"myservice": mock_ms, "spotify": mock_sp})
 
     @pytest.mark.asyncio
-    async def test_new_playlist_created(self, mock_apple, mock_sp):
+    async def test_new_playlist_created(self, mock_ms, mock_sp):
         tracks = [make_track("Song A"), make_track("Song B")]
-        source_pl = make_playlist(name="My Apple PL", tracks=tracks, source="Apple Music")
+        source_pl = make_playlist(name="My PL", tracks=tracks, source="My Service")
 
-        mock_apple.get_playlist.return_value = source_pl
+        mock_ms.get_playlist.return_value = source_pl
         mock_sp.search_track.side_effect = ["spotify:track:aaa", "spotify:track:bbb"]
         mock_sp.get_existing_playlist.return_value = None
         mock_sp.create_playlist.return_value = "sp_new"
 
-        migrator = self._make_migrator(mock_apple, mock_sp)
+        migrator = self._make_migrator(mock_ms, mock_sp)
         result = await migrator.migrate(
-            source_id="applemusic", target_id="spotify", playlist_identifier="am_pl_001"
+            source_id="myservice", target_id="spotify", playlist_identifier="ms_pl_001"
         )
 
         assert result.migrated_count == 2

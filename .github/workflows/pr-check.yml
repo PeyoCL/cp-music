@@ -45,7 +45,7 @@ jobs:
           subjectPatternError: |
             The PR title must be at least 10 characters after the type prefix.
             Examples:
-              feat: add Apple Music provider
+              feat: add new music provider integration
               fix: handle rate limit on YTMusic search
               docs: update Spotify setup guide
 
