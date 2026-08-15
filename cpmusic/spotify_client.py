@@ -453,13 +453,12 @@ class SpotifyClient:
 
         try:
             import base64
-            import urllib.request
 
-            req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req) as response:
-                image_data = response.read()
+            import requests as req_lib
 
-            b64_image = base64.b64encode(image_data).decode("utf-8")
+            response = req_lib.get(image_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            response.raise_for_status()
+            b64_image = base64.b64encode(response.content).decode("utf-8")
             self.sp.playlist_upload_cover_image(playlist_id, b64_image)
             logger.info("Successfully updated cover image for Spotify playlist %s", playlist_id)
         except Exception as err:

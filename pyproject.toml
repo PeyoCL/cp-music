@@ -48,6 +48,9 @@ dev = [
 [tool.ruff]
 line-length = 120
 target-version = "py314"
+# Exclude docs — Ruff formats Python blocks inside .md files which breaks
+# documentation examples deliberately written in a readable multi-line style.
+exclude = ["docs/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
