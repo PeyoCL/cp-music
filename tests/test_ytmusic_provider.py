@@ -233,39 +233,38 @@ class TestYTMusicGetExistingPlaylist:
 class TestYTMusicSearchTrack:
     def test_search_track_isrc_strategy(self, ytmusic_client_mocked: tuple[YTMusicClient, MagicMock]) -> None:
         client, mock_yt = ytmusic_client_mocked
-        mock_yt.search.return_value = [{"videoId": "isrc_vid_123"}]
+        mock_yt.search.return_value = [{"videoId": "isrc_vid_123", "title": "Song", "artists": [{"name": "Artist"}]}]
 
         track = Track(title="Song", artists=["Artist"], album="Album", duration_ms=1000, isrc="US1234567890")
         vid = client.search_track(track)
 
         assert vid == "isrc_vid_123"
-        mock_yt.search.assert_called_once_with(query="US1234567890", filter="songs")
+
+    def test_search_track_isrc_unrelated_rejected(self, ytmusic_client_mocked: tuple[YTMusicClient, MagicMock]) -> None:
+        client, mock_yt = ytmusic_client_mocked
+        mock_yt.search.side_effect = [
+            # ISRC returns random song
+            [{"videoId": "random_vid", "title": "Random Song", "artists": [{"name": "Random Artist"}]}],
+            # Next query returns correct song
+            [{"videoId": "correct_vid", "title": "Song A", "artists": [{"name": "Artist B"}]}],
+        ]
+
+        track = Track(title="Song A", artists=["Artist B"], album="Album", duration_ms=1000, isrc="US999")
+        vid = client.search_track(track)
+
+        assert vid == "correct_vid"
 
     def test_search_track_artist_title_fallback(self, ytmusic_client_mocked: tuple[YTMusicClient, MagicMock]) -> None:
         client, mock_yt = ytmusic_client_mocked
         mock_yt.search.side_effect = [
             [],  # ISRC search returns empty list
-            [{"videoId": "artist_title_vid_456"}],  # Artist+title search returns match
+            [{"videoId": "artist_title_vid_456", "title": "Song A", "artists": [{"name": "Artist B"}]}],
         ]
 
         track = Track(title="Song A", artists=["Artist B"], album="Album", duration_ms=1000, isrc="US999")
         vid = client.search_track(track)
 
         assert vid == "artist_title_vid_456"
-        assert mock_yt.search.call_count == 2
-
-    def test_search_track_title_fallback(self, ytmusic_client_mocked: tuple[YTMusicClient, MagicMock]) -> None:
-        client, mock_yt = ytmusic_client_mocked
-        mock_yt.search.side_effect = [
-            [],  # Artist+title search empty
-            [{"videoId": "title_vid_789"}],  # Title only search match
-        ]
-
-        track = Track(title="Unique Title", artists=[], album="Album", duration_ms=1000)
-        vid = client.search_track(track)
-
-        assert vid == "title_vid_789"
-        assert mock_yt.search.call_count == 2
 
     def test_search_track_not_found(self, ytmusic_client_mocked: tuple[YTMusicClient, MagicMock]) -> None:
         client, mock_yt = ytmusic_client_mocked

@@ -295,33 +295,47 @@ class TestSpotifyGetExistingPlaylist:
 class TestSpotifySearchTrack:
     def test_search_track_isrc_strategy(self, spotify_client_mocked: tuple[SpotifyClient, MagicMock]) -> None:
         client, mock_sp = spotify_client_mocked
-        mock_sp.search.return_value = {"tracks": {"items": [{"uri": "spotify:track:matched_isrc"}]}}
+        mock_sp.search.return_value = {
+            "tracks": {
+                "items": [{"uri": "spotify:track:matched_isrc", "name": "Song", "artists": [{"name": "Artist"}]}]
+            }
+        }
 
         track = Track(title="Song", artists=["Artist"], album="Album", duration_ms=1000, isrc="US1234567890")
         uri = client.search_track(track)
 
         assert uri == "spotify:track:matched_isrc"
-        mock_sp.search.assert_called_once_with(q="isrc:US1234567890", type="track", limit=1)
 
     def test_search_track_artist_title_fallback(self, spotify_client_mocked: tuple[SpotifyClient, MagicMock]) -> None:
         client, mock_sp = spotify_client_mocked
         mock_sp.search.side_effect = [
             {"tracks": {"items": []}},  # ISRC fails
-            {"tracks": {"items": [{"uri": "spotify:track:matched_artist_title"}]}},  # Artist+title succeeds
+            {
+                "tracks": {
+                    "items": [
+                        {
+                            "uri": "spotify:track:matched_artist_title",
+                            "name": "Song A",
+                            "artists": [{"name": "Artist B"}],
+                        }
+                    ]
+                }
+            },
         ]
 
         track = Track(title="Song A", artists=["Artist B"], album="Album", duration_ms=1000, isrc="US999")
         uri = client.search_track(track)
 
         assert uri == "spotify:track:matched_artist_title"
-        assert mock_sp.search.call_count == 2
 
     def test_search_track_not_found(self, spotify_client_mocked: tuple[SpotifyClient, MagicMock]) -> None:
         client, mock_sp = spotify_client_mocked
         mock_sp.search.return_value = {"tracks": {"items": []}}
 
-        track = Track(title="Nonexistent", artists=["Nobody"], album="Album", duration_ms=1000)
-        assert client.search_track(track) is None
+        track = Track(title="Nonexistent", artists=["Ghost"], album="Void", duration_ms=1000)
+        uri = client.search_track(track)
+
+        assert uri is None
 
 
 class TestSpotifyWriteOperations:

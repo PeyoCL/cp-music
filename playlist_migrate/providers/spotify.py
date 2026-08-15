@@ -37,6 +37,7 @@ from playlist_migrate.exceptions import (
     PlaylistModificationError,
     SpotifyAuthError,
 )
+from playlist_migrate.matching import clean_track_title, score_candidate
 from playlist_migrate.models import Playlist, Track
 
 logger = logging.getLogger(__name__)
@@ -322,10 +323,11 @@ class SpotifyClient:
     def search_track(self, track: Track) -> str | None:
         """Search Spotify for a track and return its URI, or None.
 
-        Uses a multi-tiered strategy:
-          1. Search by ISRC (highest confidence, if available).
-          2. Search by "Artist - Title" query.
-          3. Search by Title only (broadest fallback).
+        Uses a multi-tiered search and candidate scoring strategy:
+          1. Search by ISRC (structured lookup).
+          2. Search by cleaned "artist:X track:Y" query.
+          3. Search by cleaned "Artist Track" query.
+          4. Search by cleaned Title.
 
         Args:
             track: :class:`Track` to search for.
@@ -336,56 +338,81 @@ class SpotifyClient:
         if not self.sp:
             return None
 
-        def _first_uri(results: dict) -> str | None:
-            """Extract the first track URI from a Spotify search response."""
+        clean_title = clean_track_title(track.title)
+        primary_artist = track.artists[0] if track.artists else ""
+
+        def _evaluate_results(results: dict) -> tuple[str | None, float]:
             items = results.get("tracks", {}).get("items", [])
-            if items:
-                return items[0].get("uri")
-            return None
+            best_uri: str | None = None
+            best_score = 0.0
+            for item in items:
+                uri = item.get("uri")
+                if not uri:
+                    continue
+                c_title = item.get("name") or ""
+                c_artists = [a.get("name", "") for a in item.get("artists", []) if a.get("name")]
+                c_dur_ms = item.get("duration_ms", 0)
+
+                score = score_candidate(
+                    candidate_title=c_title,
+                    candidate_artists=c_artists,
+                    target_title=track.title,
+                    target_artists=track.artists,
+                    target_duration_ms=track.duration_ms,
+                    candidate_duration_seconds=int(c_dur_ms / 1000) if c_dur_ms else 0,
+                )
+                if score > best_score:
+                    best_score = score
+                    best_uri = uri
+            return best_uri, best_score
 
         # Strategy 1: ISRC lookup (most accurate cross-platform identifier)
         if track.isrc:
             try:
-                results = self.sp.search(q=f"isrc:{track.isrc}", type="track", limit=1)
-                uri = _first_uri(results)
-                if uri:
-                    logger.debug(
-                        "Matched '%s' on Spotify via ISRC (%s).",
-                        track.title,
-                        track.isrc,
-                    )
+                results = self.sp.search(q=f"isrc:{track.isrc}", type="track", limit=5)
+                uri, score = _evaluate_results(results)
+                if uri and score >= 0.60:
+                    logger.debug("Matched '%s' on Spotify via verified ISRC (%s).", track.title, track.isrc)
                     return uri
             except Exception as err:
                 logger.debug("Spotify ISRC search failed for %s: %s", track.isrc, err)
 
-        # Strategy 2: Artist + Title
-        try:
-            results = self.sp.search(
-                q=f"artist:{track.artists[0] if track.artists else ''} track:{track.title}",
-                type="track",
-                limit=1,
-            )
-            uri = _first_uri(results)
-            if uri:
-                logger.debug("Matched '%s' on Spotify via artist+title search.", track.title)
-                return uri
-        except Exception as err:
-            logger.debug("Spotify artist+title search failed for '%s': %s", track.title, err)
+        # Strategy 2: Multi-query searches with scoring
+        queries = []
+        if primary_artist and clean_title:
+            queries.append(f'artist:"{primary_artist}" track:"{clean_title}"')
+            queries.append(f"{primary_artist} {clean_title}")
+        if track.artist_name and track.title:
+            queries.append(f"{track.artist_name} {track.title}")
+        if clean_title:
+            queries.append(clean_title)
 
-        # Strategy 3: Title fallback
-        try:
-            results = self.sp.search(q=track.title, type="track", limit=1)
-            uri = _first_uri(results)
-            if uri:
-                logger.debug("Matched '%s' on Spotify via title fallback.", track.title)
-                return uri
-        except Exception as err:
-            logger.debug("Spotify title search failed for '%s': %s", track.title, err)
+        best_overall_uri: str | None = None
+        best_overall_score = 0.0
+
+        for query_str in queries:
+            try:
+                results = self.sp.search(q=query_str, type="track", limit=5)
+                uri, score = _evaluate_results(results)
+                if score > best_overall_score:
+                    best_overall_score = score
+                    best_overall_uri = uri
+
+                if best_overall_score >= 0.80:
+                    logger.debug("Matched '%s' on Spotify via '%s' (score=%.2f).", track.title, query_str, score)
+                    return best_overall_uri
+            except Exception as err:
+                logger.debug("Spotify search failed for '%s': %s", query_str, err)
+
+        if best_overall_uri and best_overall_score >= 0.60:
+            logger.debug("Matched '%s' on Spotify with candidate score=%.2f.", track.title, best_overall_score)
+            return best_overall_uri
 
         logger.warning(
-            "Could not find '%s' by %s on Spotify.",
+            "Could not find a confident match for '%s' by %s on Spotify (best score: %.2f).",
             track.title,
             track.artist_name,
+            best_overall_score,
         )
         return None
 

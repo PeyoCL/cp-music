@@ -41,6 +41,7 @@ from playlist_migrate.exceptions import (
     PlaylistModificationError,
     YTMusicAuthError,
 )
+from playlist_migrate.matching import clean_track_title, score_candidate
 from playlist_migrate.models import Playlist, Track
 
 logger = logging.getLogger(__name__)
@@ -203,68 +204,128 @@ class YTMusicClient:
     def search_track(self, track: Track) -> str | None:
         """Search YouTube Music for a track and return its video ID.
 
-        Uses a 3-tier matching strategy:
-          1. ISRC code (highest confidence cross-platform match).
-          2. "Artist - Title" query.
-          3. Title-only fallback.
+        Uses an intelligent multi-stage search and candidate scoring strategy:
+          1. ISRC search with validation (verifies title and artist match).
+          2. Cleaned "Artist - Title" search (filters "songs").
+          3. "Artist Title" search (filters "songs").
+          4. Video / Community audio search fallback for unindexed/special tracks.
+          5. Title fallback search with artist verification.
 
         Args:
             track: :class:`Track` to look up.
 
         Returns:
-            YouTube Music video ID if found, otherwise ``None``.
+            YouTube Music video ID if confident match found, otherwise ``None``.
         """
         if not self.ytmusic:
             return None
 
-        def _first_video_id(results: list) -> str | None:
-            if results:
-                return results[0].get("videoId")
-            return None
+        clean_title = clean_track_title(track.title)
+        primary_artist = track.artists[0] if track.artists else ""
 
-        # Strategy 1: ISRC
+        def _evaluate_results(results: list) -> tuple[str | None, float]:
+            best_vid: str | None = None
+            best_score = 0.0
+            for item in results:
+                vid = item.get("videoId")
+                if not vid:
+                    continue
+                c_title = item.get("title") or ""
+                c_artists = [
+                    a.get("name", "") for a in item.get("artists", []) if isinstance(a, dict) and a.get("name")
+                ]
+                c_dur_sec = item.get("duration_seconds")
+                if not c_dur_sec and item.get("duration"):
+                    parts = str(item.get("duration")).split(":")
+                    if len(parts) == 2:
+                        try:
+                            c_dur_sec = int(parts[0]) * 60 + int(parts[1])
+                        except ValueError:
+                            c_dur_sec = 0
+                    elif len(parts) == 3:
+                        try:
+                            c_dur_sec = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                        except ValueError:
+                            c_dur_sec = 0
+
+                score = score_candidate(
+                    candidate_title=c_title,
+                    candidate_artists=c_artists,
+                    target_title=track.title,
+                    target_artists=track.artists,
+                    target_duration_ms=track.duration_ms,
+                    candidate_duration_seconds=c_dur_sec or 0,
+                )
+                if score > best_score:
+                    best_score = score
+                    best_vid = vid
+
+            return best_vid, best_score
+
+        # Strategy 1: ISRC lookup with strict validation
         if track.isrc:
             try:
                 results = self.ytmusic.search(query=track.isrc, filter="songs")
-                vid = _first_video_id(results)
-                if vid:
+                vid, score = _evaluate_results(results)
+                if vid and score >= 0.65:
                     logger.debug(
-                        "Matched '%s' on YTMusic via ISRC (%s).",
+                        "Matched '%s' on YTMusic via verified ISRC (%s, score=%.2f).",
                         track.title,
                         track.isrc,
+                        score,
                     )
                     return vid
             except Exception as err:
                 logger.debug("YTMusic ISRC search failed for %s: %s", track.isrc, err)
 
-        # Strategy 2: Artist + Title
-        try:
-            results = self.ytmusic.search(query=track.search_query, filter="songs")
-            vid = _first_video_id(results)
-            if vid:
-                logger.debug("Matched '%s' on YTMusic via artist+title search.", track.title)
-                return vid
-        except Exception as err:
-            logger.debug(
-                "YTMusic artist+title search failed for '%s': %s",
-                track.search_query,
-                err,
-            )
+        # Strategy 2: Cleaned query searches
+        queries: list[tuple[str, str | None]] = []
+        if primary_artist and clean_title:
+            queries.append((f"{primary_artist} - {clean_title}", "songs"))
+            queries.append((f"{primary_artist} {clean_title}", "songs"))
+        if track.artist_name and track.title:
+            queries.append((f"{track.artist_name} {track.title}", "songs"))
+        if primary_artist and clean_title:
+            queries.append((f"{primary_artist} - {clean_title}", None))  # Video search
+        if clean_title:
+            queries.append((f"{clean_title} {primary_artist}".strip(), None))
 
-        # Strategy 3: Title fallback
-        try:
-            results = self.ytmusic.search(query=track.title, filter="songs")
-            vid = _first_video_id(results)
-            if vid:
-                logger.debug("Matched '%s' on YTMusic via title fallback.", track.title)
-                return vid
-        except Exception as err:
-            logger.debug("YTMusic title search failed for '%s': %s", track.title, err)
+        best_overall_vid: str | None = None
+        best_overall_score = 0.0
+
+        for query_str, filter_type in queries:
+            try:
+                if filter_type:
+                    results = self.ytmusic.search(query=query_str, filter=filter_type)
+                else:
+                    results = self.ytmusic.search(query=query_str)
+
+                vid, score = _evaluate_results(results)
+                if score > best_overall_score:
+                    best_overall_score = score
+                    best_overall_vid = vid
+
+                # High confidence early exit
+                if best_overall_score >= 0.80:
+                    logger.debug("Matched '%s' on YTMusic via '%s' (score=%.2f).", track.title, query_str, score)
+                    return best_overall_vid
+            except Exception as err:
+                logger.debug("YTMusic query '%s' failed: %s", query_str, err)
+
+        # Threshold acceptance
+        if best_overall_vid and best_overall_score >= 0.60:
+            logger.debug(
+                "Matched '%s' on YTMusic with candidate score=%.2f.",
+                track.title,
+                best_overall_score,
+            )
+            return best_overall_vid
 
         logger.warning(
-            "Could not find '%s' by %s on YouTube Music.",
+            "Could not find a confident match for '%s' by %s on YouTube Music (best score: %.2f).",
             track.title,
             track.artist_name,
+            best_overall_score,
         )
         return None
 
