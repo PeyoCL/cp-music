@@ -60,7 +60,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Comment checklist on new PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.issues.createComment({
