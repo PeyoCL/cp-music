@@ -16,7 +16,10 @@ El flujo de integración de un nuevo proveedor tiene 4 pasos:
 
 ## 1. Implementar el Protocolo `MusicProvider`
 
-El contrato que debe cumplir cualquier cliente está definido en [`playlist_migrate/interfaces.py`](../playlist_migrate/interfaces.py). Gracias a `typing.Protocol`, **no necesitas heredar** de ninguna clase base: solo debes implementar los métodos con las firmas correctas.
+El contrato que debe cumplir cualquier cliente está definido en [`playlist_migrate/interfaces.py`](../playlist_migrate/interfaces.py). Gracias a `typing.Protocol`, **no necesitas heredar** de ninguna clase base: solo debes implementar los métodos con las firmas y tipos esperados (duck typing estructural).
+
+> [!TIP]
+> En `playlist_migrate/interfaces.py`, la definición del protocolo utiliza directamente los *docstrings* como cuerpo de cada método, cumpliendo con los estándares de análisis estático de **CodeQL** y **Ruff** (evitando sentencias `...` redundantes).
 
 Crea un nuevo archivo en `playlist_migrate/providers/`:
 
@@ -39,11 +42,12 @@ class YourServiceClient:
         """Obtiene una playlist completa (con todos sus tracks) del servicio.
 
         Args:
-            identifier: ID nativo de la playlist en el servicio.
+            identifier: ID nativo o URL de la playlist en el servicio.
 
         Returns:
             Playlist con todos sus tracks como objetos Track.
         """
+        # Implementación: llamada a la API y mapeo a modelo Track/Playlist
         ...
 
     def get_existing_playlist(self, name: str) -> Playlist | None:
@@ -52,10 +56,11 @@ class YourServiceClient:
         Returns:
             La Playlist si se encuentra, None en caso contrario.
         """
+        # Implementación: búsqueda de playlist existente
         ...
 
     def search_track(self, track: Track) -> str | None:
-        """Busca un track en el servicio y devuelve su ID nativo.
+        """Busca un track en el servicio y devuelve su ID nativo (o URI).
 
         Prioriza la búsqueda por ISRC si el servicio lo soporta,
         ya que ofrece un matching exacto y sin ambigüedades.
@@ -63,34 +68,82 @@ class YourServiceClient:
         Returns:
             El ID nativo del track en el servicio, o None si no se encontró.
         """
+        # Implementación: búsqueda por ISRC o título/artistas con score_candidate
         ...
 
     def create_playlist(self, title: str, description: str = "") -> str:
         """Crea una nueva playlist vacía y devuelve su ID nativo."""
+        # Implementación: creación en la API
         ...
 
-    def add_tracks(self, playlist_id: str, track_ids: list[str]) -> None:
-        """Añade tracks a una playlist existente.
+    def add_tracks(
+        self,
+        playlist_id: str,
+        track_ids: list[str],
+        chunk_size: int = 100,
+    ) -> None:
+        """Añade tracks a una playlist existente en lotes seguros.
 
-        Implementa paginación interna si el servicio limita la cantidad
-        de tracks por petición.
+        Args:
+            playlist_id: ID nativo de la playlist destino.
+            track_ids: Lista de IDs o URIs nativos a añadir.
+            chunk_size: Tamaño de lote según límites de la API del servicio.
         """
+        # Implementación: iteración por chunks y envío a la API
         ...
 
     def clear_playlist(self, playlist_id: str) -> None:
         """Elimina todos los tracks de una playlist (usado en modo --sync)."""
+        # Implementación: vaciar playlist
         ...
 
     def get_liked_songs(self) -> Playlist:
         """Obtiene la biblioteca de canciones favoritas / 'me gusta' del usuario autenticado."""
+        # Implementación: obtener favoritos del usuario
         ...
 
-    def add_liked_songs(self, track_ids: list[str]) -> None:
+    def add_liked_songs(
+        self,
+        track_ids: list[str],
+        chunk_size: int = 50,
+    ) -> None:
         """Marca o guarda canciones en la biblioteca de favoritos del usuario autenticado."""
+        # Implementación: guardar canciones favoritas
         ...
 ```
 
 Exporta el nuevo cliente en [`playlist_migrate/providers/__init__.py`](../playlist_migrate/providers/__init__.py).
+
+### Definición del Protocolo en `interfaces.py`
+
+Para referencia, el contrato base en [`playlist_migrate/interfaces.py`](../playlist_migrate/interfaces.py) se define de la siguiente manera:
+
+```python
+class MusicProvider(Protocol):
+    def get_playlist(self, identifier: str) -> Playlist:
+        """Fetch a full playlist including all tracks."""
+
+    def get_existing_playlist(self, name: str) -> Playlist | None:
+        """Find and return a user playlist with the given name, or None."""
+
+    def search_track(self, track: Track) -> str | None:
+        """Search the service for a track and return its native ID (or URI)."""
+
+    def create_playlist(self, title: str, description: str = "") -> str:
+        """Create a new playlist for the authenticated user."""
+
+    def add_tracks(self, playlist_id: str, track_ids: list[str], chunk_size: int) -> None:
+        """Add a list of native track IDs to the specified playlist."""
+
+    def clear_playlist(self, playlist_id: str) -> None:
+        """Remove all tracks from the specified playlist."""
+
+    def get_liked_songs(self) -> Playlist:
+        """Fetch the authenticated user's liked / favorite songs library."""
+
+    def add_liked_songs(self, track_ids: list[str]) -> None:
+        """Add / mark tracks as liked in the authenticated user's native library."""
+```
 
 ### Modelos Compartidos
 
