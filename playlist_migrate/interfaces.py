@@ -26,7 +26,6 @@ class MusicProvider(Protocol):
         Returns:
             A `Playlist` model populated with all tracks.
         """
-        ...
 
     def get_existing_playlist(self, name: str) -> Playlist | None:
         """Find and return a user playlist with the given name, or None.
@@ -37,7 +36,6 @@ class MusicProvider(Protocol):
         Returns:
             Fully populated `Playlist`, or None if not found.
         """
-        ...
 
     def search_track(self, track: Track) -> str | None:
         """Search the service for a track and return its native ID (or URI).
@@ -48,7 +46,6 @@ class MusicProvider(Protocol):
         Returns:
             The native service track ID string, or None if not found.
         """
-        ...
 
     def create_playlist(self, title: str, description: str = "") -> str:
         """Create a new playlist for the authenticated user.
@@ -60,7 +57,6 @@ class MusicProvider(Protocol):
         Returns:
             The newly created playlist's native ID.
         """
-        ...
 
     def add_tracks(self, playlist_id: str, track_ids: list[str], chunk_size: int) -> None:
         """Add a list of native track IDs to the specified playlist.
@@ -70,7 +66,6 @@ class MusicProvider(Protocol):
             track_ids: List of native service track IDs/URIs to add.
             chunk_size: Safe batch size for the service API.
         """
-        ...
 
     def clear_playlist(self, playlist_id: str) -> None:
         """Remove all tracks from the specified playlist.
@@ -78,7 +73,6 @@ class MusicProvider(Protocol):
         Args:
             playlist_id: Target playlist ID.
         """
-        ...
 
     def get_liked_songs(self) -> Playlist:
         """Fetch the authenticated user's liked / favorite songs library.
@@ -86,7 +80,6 @@ class MusicProvider(Protocol):
         Returns:
             A `Playlist` model populated with all liked tracks.
         """
-        ...
 
     def add_liked_songs(self, track_ids: list[str]) -> None:
         """Add / mark tracks as liked in the authenticated user's native library.
@@ -94,4 +87,3 @@ class MusicProvider(Protocol):
         Args:
             track_ids: List of native service track IDs/URIs to like/save.
         """
-        ...
